@@ -58,3 +58,17 @@ Uses only lines.
 * Duration of trials: 2–3 s each
 * Dilation/contraction frequency: find this (in the paper, it was every 0.5 s)
 * Inter-stimulus interval for participants to enter their rating
+* Optoma HD25 settings: HD, 1080p, 2000 ANSI lumens, 120 Hz projector
+* Computer monitor: 60 Hz (approximated; frames are rendered to the nearest millisecond due to delays being multiples of 1 ms)
+* 3 variables:
+    * Radius of circle
+    * Length of line
+    * Angle of line
+        * First!
+            * Could just go with optimized angle.
+            * Randomize length & radius?
+                * Radius second.
+                * Min length: find experimentally.
+                * Max length: find by finding where the effect starts plateauing.
+* Receptive field size varies with eccentricity (distance from center).
+    * Min length of lines to create effect changes → dependent on radius.

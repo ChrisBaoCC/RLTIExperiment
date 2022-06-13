@@ -8,31 +8,38 @@ __date__ = "28 May 2022"
 # Imports
 from math import pi, cos, sin
 import numpy as np
-from tkinter import Tk, Canvas
+from tkinter import Tk, Canvas, messagebox
 
 # Constants
 SCREEN_WIDTH: int = 1920
 SCREEN_HEIGHT: int = 1080
 
+FRAME_RATE: int = 60 # 100 or 60 Hz
+STIM_PERIOD: int = FRAME_RATE / 2 # frames for one expansion/contraction (= 0.5 s)
+
 N_STIM: int = 120   # number of stimuli to show
-# radius of circle of stimuli.
-# inner endpoints of lines are this distance from center.
-INNER_RADIUS_BASE: int = 400
-STIM_PERIOD: int = 50  # frames for one expansion/contraction (= 0.5 s)
+# Radius of stimuli. Inner endpoints of lines are this distance from center.
+INNER_RADIUS_BASE: int = 200
 LINE_WIDTH: int = 5
 
-LINE_LENGTHS: list[int] = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650]
+LINE_LENGTHS: list[int] = [50, 75, 100, 150, 200, 250, 300]
 N_LINE_LENGTHS: int = 10
 
 LINE_ANGLES: list[int] = [8, 16, 24, 32, 40, 48, 56, 64, 72, 80]
 N_LINE_ANGLES: int = 10
 
+SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
+        + " seizures for people with photosensitive epilepsy."\
+        + " If you suspect you have photosensitive epilepsy or have a history"\
+        + " of photosensitive epilepsy, please press the [No] button now."\
+        + "\n\nDo you wish to proceed?"
+
 # Global variables
 window: Tk
 canvas: Canvas
 
-line_angle: int = LINE_ANGLES[5]  # degrees
-line_length: int = LINE_LENGTHS[5]
+line_angle: int = LINE_ANGLES[5] # degrees
+line_length: int =  LINE_LENGTHS[2]
 
 inner_radius: int = INNER_RADIUS_BASE
 frame_count: int = 0
@@ -89,7 +96,7 @@ def get_outer(i: int) -> np.array:
 
 def animate() -> None:
     """
-    Animates the experiment.
+    Animates the illusion.
 
     Parameters
     ----------
@@ -100,22 +107,36 @@ def animate() -> None:
     None
     """
     global frame_count, inner_radius
-    canvas.delete("all")
+    canvas.delete("line")
     for i in range(N_STIM):
         canvas.create_line(
             *get_inner(i),
             *get_outer(i),
             fill="black",
-            width=LINE_WIDTH
+            width=LINE_WIDTH,
+            tags="line"
         )
+
     if frame_count < STIM_PERIOD/2:
-        inner_radius += INNER_RADIUS_BASE * (1 / STIM_PERIOD)
+        inner_radius += line_length * (1 / STIM_PERIOD)
     else:
-        inner_radius -= INNER_RADIUS_BASE * (1 / STIM_PERIOD)
+        inner_radius -= line_length * (1 / STIM_PERIOD)
+
+    # delay of 10 ms -> 100 fps
+    if FRAME_RATE == 100:
+        canvas.after(10, animate)
+    # approximate 60 fps
+    elif FRAME_RATE == 60:
+        if frame_count % 3 == 1:
+            canvas.after(16, animate)
+        else:
+            canvas.after(17, animate)
+    # fallback
+    else:
+        canvas.after(1000 / FRAME_RATE, animate)
+
     frame_count += 1
     frame_count %= STIM_PERIOD
-    canvas.after(10, animate)  # delay of 10 ms -> 100 fps
-
 
 def main() -> None:
     """
@@ -137,11 +158,14 @@ def main() -> None:
                     bg="white", highlightthickness=0)
     canvas.pack()
 
-    # start animation
-    animate()
-
-    window.mainloop()
-
+    if messagebox.askyesno(title="Epilepsy warning",
+            message=SEIZURE_WARNING,
+            icon="warning"):
+        canvas.create_oval(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2 - 5,
+                SCREEN_WIDTH / 2 + 5, SCREEN_HEIGHT / 2 + 5,
+                fill="black", width=0)
+        animate()
+        window.mainloop()
 
 if __name__ == "__main__":
     main()
