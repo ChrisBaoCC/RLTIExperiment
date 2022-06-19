@@ -7,8 +7,9 @@ __date__ = "28 May 2022"
 
 # Imports
 from math import pi, cos, sin
+from random import shuffle
 import numpy as np
-from tkinter import Tk, Canvas, messagebox
+from tkinter import Event, Tk, Canvas, messagebox
 
 # Constants
 SCREEN_WIDTH: int = 1920
@@ -23,10 +24,10 @@ INNER_RADIUS_BASE: int = 200
 LINE_WIDTH: int = 5
 
 LINE_LENGTHS: list[int] = [50, 75, 100, 150, 200, 250, 300]
-N_LINE_LENGTHS: int = 10
+N_LINE_LENGTHS: int = 7
 
-LINE_ANGLES: list[int] = [8, 16, 24, 32, 40, 48, 56, 64, 72, 80]
-N_LINE_ANGLES: int = 10
+LINE_ANGLES: list[int] = [20, 30, 40, 50, 60, 70]
+N_LINE_ANGLES: int = 6
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
         + " seizures for people with photosensitive epilepsy."\
@@ -34,16 +35,25 @@ SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
         + " of photosensitive epilepsy, please press the [No] button now."\
         + "\n\nDo you wish to proceed?"
 
+STATE_PLAY = 0
+STATE_RATE = 1
+
+PLAY_LENGTH = FRAME_RATE * 5 # illusion up for 5 s
+
 # Global variables
 window: Tk
 canvas: Canvas
 
-line_angle: int = LINE_ANGLES[5] # degrees
+line_angle: int = LINE_ANGLES[2] # degrees
 line_length: int =  LINE_LENGTHS[2]
 
 inner_radius: int = INNER_RADIUS_BASE
 frame_count: int = 0
 
+state: int
+trials: list
+
+trial: int = 0
 
 def pol_to_rect(r: float, theta: float) -> np.array:
     """
@@ -94,6 +104,23 @@ def get_outer(i: int) -> np.array:
         + get_inner(i)
 
 
+def draw_fixation() -> None:
+    """
+    Draw a fixation dot in the center of the screen.
+    
+    Parameters
+    ----------
+    none taken.
+
+    Returns
+    -------
+    None
+    """
+    canvas.create_oval(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2 - 5,
+            SCREEN_WIDTH / 2 + 5, SCREEN_HEIGHT / 2 + 5,
+            fill="black", width=0, tags=["fixation","play"])
+
+
 def animate() -> None:
     """
     Animates the illusion.
@@ -106,22 +133,38 @@ def animate() -> None:
     -------
     None
     """
-    global frame_count, inner_radius
-    canvas.delete("line")
-    for i in range(N_STIM):
-        canvas.create_line(
-            *get_inner(i),
-            *get_outer(i),
-            fill="black",
-            width=LINE_WIDTH,
-            tags="line"
-        )
+    global state, frame_count, inner_radius, trial
 
-    if frame_count < STIM_PERIOD/2:
-        inner_radius += line_length * (1 / STIM_PERIOD)
-    else:
-        inner_radius -= line_length * (1 / STIM_PERIOD)
+    if state == STATE_PLAY:
+        if frame_count > PLAY_LENGTH:
+            state = STATE_RATE
+            trial += 1
+        else:
+            canvas.delete("play")
+            draw_fixation()
+            line_length = LINE_LENGTHS[trials[trial]]
+            for i in range(N_STIM):
+                canvas.create_line(
+                    *get_inner(i),
+                    *get_outer(i),
+                    fill="black",
+                    width=LINE_WIDTH,
+                    tags=["line", "play"]
+                )
 
+            if frame_count % STIM_PERIOD < STIM_PERIOD/2:
+                inner_radius += line_length * (1 / STIM_PERIOD)
+            else:
+                inner_radius -= line_length * (1 / STIM_PERIOD)
+    elif state == STATE_RATE:
+        canvas.delete("play")
+        canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                text="Rate the illusion",
+                font="Arial 24 bold",
+                fill="black",
+                tags=["rate"])
+        frame_count = 0
+    
     # delay of 10 ms -> 100 fps
     if FRAME_RATE == 100:
         canvas.after(10, animate)
@@ -136,7 +179,25 @@ def animate() -> None:
         canvas.after(1000 / FRAME_RATE, animate)
 
     frame_count += 1
-    frame_count %= STIM_PERIOD
+
+def handle_key(event: Event) -> None:
+    """
+    Handles keypresses by the user. For monitoring responses in the rate phase.
+    
+    Parameters
+    ----------
+    event: Event keypress event.
+
+    Returns
+    -------
+    None
+    """
+    global state
+
+    if state == STATE_RATE:
+        canvas.delete("rate")
+        state = STATE_PLAY
+
 
 def main() -> None:
     """
@@ -150,7 +211,7 @@ def main() -> None:
     -------
     None
     """
-    global window, canvas
+    global window, canvas, trials, state
     window = Tk()
     window.attributes('-fullscreen', True)  # note: requires Alt-F4 to exit
 
@@ -158,14 +219,19 @@ def main() -> None:
                     bg="white", highlightthickness=0)
     canvas.pack()
 
-    if messagebox.askyesno(title="Epilepsy warning",
+    if not messagebox.askyesno(title="Epilepsy warning",
             message=SEIZURE_WARNING,
             icon="warning"):
-        canvas.create_oval(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2 - 5,
-                SCREEN_WIDTH / 2 + 5, SCREEN_HEIGHT / 2 + 5,
-                fill="black", width=0)
-        animate()
-        window.mainloop()
+        return
+
+    window.bind("<Key>", handle_key)
+
+    trials = [i for i in range(N_LINE_LENGTHS)] * 3
+    shuffle(trials)
+    
+    state = STATE_PLAY
+    animate()
+    window.mainloop()
 
 if __name__ == "__main__":
     main()
