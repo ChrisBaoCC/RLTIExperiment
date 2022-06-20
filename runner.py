@@ -15,7 +15,7 @@ from tkinter import Event, Tk, Canvas, messagebox
 SCREEN_WIDTH: int = 1920
 SCREEN_HEIGHT: int = 1080
 
-FRAME_RATE: int = 60 # 100 or 60 Hz
+FRAME_RATE: int = 100 # 100 or 60 Hz
 STIM_PERIOD: int = FRAME_RATE / 2 # frames for one expansion/contraction (= 0.5 s)
 
 N_STIM: int = 120   # number of stimuli to show
@@ -37,6 +37,7 @@ SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
 
 STATE_PLAY = 0
 STATE_RATE = 1
+STATE_END = 2
 
 PLAY_LENGTH = FRAME_RATE * 5 # illusion up for 5 s
 
@@ -50,10 +51,12 @@ line_length: int =  LINE_LENGTHS[2]
 inner_radius: int = INNER_RADIUS_BASE
 frame_count: int = 0
 
-state: int
-trials: list
+state: int # either play or rate
+# stores index of line length to use for each trial
+trials: list[int]
 
-trial: int = 0
+trial: int = 0 # current trial number
+results: list[tuple[int, int]] = [] # line length index, user rating
 
 def pol_to_rect(r: float, theta: float) -> np.array:
     """
@@ -138,7 +141,6 @@ def animate() -> None:
     if state == STATE_PLAY:
         if frame_count > PLAY_LENGTH:
             state = STATE_RATE
-            trial += 1
         else:
             canvas.delete("play")
             draw_fixation()
@@ -159,11 +161,10 @@ def animate() -> None:
     elif state == STATE_RATE:
         canvas.delete("play")
         canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-                text="Rate the illusion",
+                text="Rate the illusion\nNumber keys 1–4",
                 font="Arial 24 bold",
                 fill="black",
                 tags=["rate"])
-        frame_count = 0
     
     # delay of 10 ms -> 100 fps
     if FRAME_RATE == 100:
@@ -192,11 +193,19 @@ def handle_key(event: Event) -> None:
     -------
     None
     """
-    global state
-
+    global state, trial, frame_count, results
     if state == STATE_RATE:
-        canvas.delete("rate")
-        state = STATE_PLAY
+        if event.char in "1234":
+            results.append((LINE_LENGTHS[trials[trial]], int(event.char)))
+            trial += 1
+            canvas.delete("rate")
+            if trial == N_LINE_LENGTHS:
+                state = STATE_END
+                print("results:")
+                print(results)
+                return
+            state = STATE_PLAY
+            frame_count = 0
 
 
 def main() -> None:
@@ -226,7 +235,8 @@ def main() -> None:
 
     window.bind("<Key>", handle_key)
 
-    trials = [i for i in range(N_LINE_LENGTHS)] * 3
+    # each level is shown 3 times
+    trials = [i for i in range(N_LINE_LENGTHS)] #* 3
     shuffle(trials)
     
     state = STATE_PLAY
