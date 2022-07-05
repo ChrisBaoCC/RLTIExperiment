@@ -2,8 +2,8 @@
 """Python script that runs the experiment."""
 
 __author__ = "Chris Bao"
-__version__ = "0.1"
-__date__ = "28 May 2022"
+__version__ = "1.0"
+__date__ = "5 Jul 2022"
 
 # Imports
 from datetime import datetime
@@ -17,7 +17,7 @@ from tkinter import Button, Entry, Event, Label, StringVar, Tk, Canvas,\
 SCREEN_WIDTH: int = 1920
 SCREEN_HEIGHT: int = 1080
 
-FRAMES_PER_SECOND: int = 60  # 100 or 60 Hz
+FRAMES_PER_SECOND: int = 60
 # frames for one expansion and contraction (= 0.5 s)
 STIM_PERIOD: int = FRAMES_PER_SECOND // 2
 
@@ -124,22 +124,46 @@ def get_outer(i: int) -> np.array:
         + get_inner(i)
 
 
-def draw_fixation() -> None:
+def begin_play() -> None:
     """
-    Draw a fixation dot in the center of the screen.
+    Draw a fixation cross in the center of the screen.
 
     Parameters
     ----------
-    none taken.
+    None taken.
 
     Returns
     -------
     None
     """
-    # tkinter doesn't have antialiasing so I used a rectangle
-    canvas.create_rectangle(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2 - 5,
-                            SCREEN_WIDTH / 2 + 5, SCREEN_HEIGHT / 2 + 5,
+    canvas.create_rectangle(SCREEN_WIDTH / 2 - 10, SCREEN_HEIGHT / 2 - 3,
+                            SCREEN_WIDTH / 2 + 10, SCREEN_HEIGHT / 2 + 3,
                             fill="black", width=0, tags=["fixation", "play"])
+    canvas.create_rectangle(SCREEN_WIDTH / 2 - 3, SCREEN_HEIGHT / 2 - 10,
+                            SCREEN_WIDTH / 2 + 3, SCREEN_HEIGHT / 2 + 10,
+                            fill="black", width=0, tags=["fixation", "play"])
+
+
+def draw_stimulus() -> None:
+    """
+    Draw the stimulus.
+
+    Parameters
+    ----------
+    None taken.
+
+    Returns
+    -------
+    None
+    """
+    for i in range(N_STIM):
+        canvas.create_line(
+            *get_inner(i),
+            *get_outer(i),
+            fill="black",
+            width=LINE_WIDTH,
+            tags=["line", "play"]
+        )
 
 
 def save() -> None:
@@ -167,6 +191,8 @@ def save() -> None:
             )
             f.write("\n")
 
+# TODO: debug
+t = open("times.csv", "w")
 
 def animate() -> None:
     """
@@ -182,6 +208,10 @@ def animate() -> None:
     """
     global state, frame_count, inner_radius, trial, line_length, line_angle
 
+    # TODO: debug
+    time = datetime.now().__str__().split(":")[-1]
+    t.write(time + "\n")
+
     if state == STATE_START:
         canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                            text="Press [Space] to continue to block 1.",
@@ -192,21 +222,12 @@ def animate() -> None:
         if frame_count > PLAY_LENGTH * FRAMES_PER_SECOND:
             state = STATE_RATE
         else:
-            canvas.delete("play")
-            draw_fixation()
+            canvas.delete("line")
             if trial < N_LINE_LENGTHS * LEVEL_FREQ:
                 line_length = LINE_LENGTHS[trials[trial]]
             elif trial >= N_LINE_LENGTHS * LEVEL_FREQ:
                 line_angle = LINE_ANGLES[trials[trial]]
-            for i in range(N_STIM):
-                canvas.create_line(
-                    *get_inner(i),
-                    *get_outer(i),
-                    fill="black",
-                    width=LINE_WIDTH,
-                    tags=["line", "play"]
-                )
-
+            draw_stimulus()
             if frame_count % STIM_PERIOD < STIM_PERIOD/2:
                 inner_radius += line_length * (1 / STIM_PERIOD)
             else:
@@ -236,21 +257,10 @@ def animate() -> None:
                            fill="black",
                            tags=["end"])
 
-    # TODO for some reason tkinter delay is shorter than it actually is
-    # so I increased the delays
-    # delay of 10 ms -> 100 fps
-    if FRAMES_PER_SECOND == 100:
-        canvas.after(12, animate)  # used to be 10
-    # approximate 60 fps
-    elif FRAMES_PER_SECOND == 60:
-        if frame_count % 3 == 1:
-            canvas.after(19, animate)  # used to be 16
-        else:
-            canvas.after(20, animate)  # used to be 17
-    # fallback
+    if frame_count % 3 == 1:
+        canvas.after(17, animate)
     else:
-        canvas.after(1200 // FRAMES_PER_SECOND, animate)  # used to be 1000
-
+        canvas.after(16, animate)
     frame_count += 1
 
 
@@ -273,6 +283,7 @@ def handle_key(event: Event) -> None:
         if event.char in " ":
             canvas.delete("start")
             state = STATE_PLAY
+            begin_play()
             frame_count = 0
     elif state == STATE_RATE:
         if event.char in "1234567":
@@ -293,6 +304,7 @@ def handle_key(event: Event) -> None:
                 stop_message = "Experiment closed."
                 return
             state = STATE_PLAY
+            begin_play()
             frame_count = 0
     elif state == STATE_REST:
         if event.char in " ":
@@ -316,6 +328,7 @@ def handle_key(event: Event) -> None:
             line_length = best_length
             
             state = STATE_PLAY
+            begin_play()
             frame_count = 0
 
 
@@ -334,6 +347,9 @@ def stop(event: Event = None):
     """
     print(stop_message)
     window.destroy()
+
+    # TODO: debug
+    t.close()
 
 
 def dismiss():
