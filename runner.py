@@ -58,6 +58,8 @@ dlg: Toplevel
 initials_var: StringVar
 cur_time: datetime
 
+lines: list[int] = []
+
 line_angle: int = LINE_ANGLES[2]  # degrees
 line_length: int = LINE_LENGTHS[2]
 
@@ -136,15 +138,27 @@ def begin_play() -> None:
     -------
     None
     """
+    global lines
     canvas.create_rectangle(SCREEN_WIDTH / 2 - 10, SCREEN_HEIGHT / 2 - 3,
                             SCREEN_WIDTH / 2 + 10, SCREEN_HEIGHT / 2 + 3,
                             fill="black", width=0, tags=["fixation", "play"])
     canvas.create_rectangle(SCREEN_WIDTH / 2 - 3, SCREEN_HEIGHT / 2 - 10,
                             SCREEN_WIDTH / 2 + 3, SCREEN_HEIGHT / 2 + 10,
                             fill="black", width=0, tags=["fixation", "play"])
+    lines = []
+    for i in range(N_STIM):
+        line_id = canvas.create_line(
+            *get_inner(i),
+            *get_outer(i),
+            fill="black",
+            width=LINE_WIDTH,
+            tags=["line", "play"]
+        ),
+
+        lines.append([line_id, list(get_inner(i))])
 
 
-def draw_stimulus() -> None:
+def update_stimulus() -> None:
     """
     Draw the stimulus.
 
@@ -156,14 +170,16 @@ def draw_stimulus() -> None:
     -------
     None
     """
+    global lines
     for i in range(N_STIM):
-        canvas.create_line(
-            *get_inner(i),
-            *get_outer(i),
-            fill="black",
-            width=LINE_WIDTH,
-            tags=["line", "play"]
+        cur_inner = lines[i][1]
+        new_inner = list(get_inner(i))
+        canvas.move(
+            lines[i][0],
+            new_inner[0] - cur_inner[0],
+            new_inner[1] - cur_inner[1]
         )
+        lines[i][1] = new_inner
 
 
 def save() -> None:
@@ -211,6 +227,7 @@ def animate() -> None:
     # TODO: debug
     time = datetime.now().__str__().split(":")[-1]
     t.write(time + "\n")
+    print(time)
 
     if state == STATE_START:
         canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
@@ -222,12 +239,12 @@ def animate() -> None:
         if frame_count > PLAY_LENGTH * FRAMES_PER_SECOND:
             state = STATE_RATE
         else:
-            canvas.delete("line")
+            # canvas.delete("line")
             if trial < N_LINE_LENGTHS * LEVEL_FREQ:
                 line_length = LINE_LENGTHS[trials[trial]]
             elif trial >= N_LINE_LENGTHS * LEVEL_FREQ:
                 line_angle = LINE_ANGLES[trials[trial]]
-            draw_stimulus()
+            update_stimulus()
             if frame_count % STIM_PERIOD < STIM_PERIOD/2:
                 inner_radius += line_length * (1 / STIM_PERIOD)
             else:
