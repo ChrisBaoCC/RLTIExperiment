@@ -17,9 +17,9 @@ from tkinter import Button, Entry, Event, Label, StringVar, Tk, Canvas,\
 SCREEN_WIDTH: int = 1920
 SCREEN_HEIGHT: int = 1080
 
-FRAMES_PER_SECOND: int = 60
+UPDATES_PER_SECOND: int = 100 # TODO: test (was 60)
 # frames for one expansion and contraction (= 0.5 s)
-STIM_PERIOD: int = FRAMES_PER_SECOND // 2
+STIM_PERIOD: int = UPDATES_PER_SECOND // 2
 
 N_STIM: int = 120   # number of stimuli to show
 # Radius of stimuli. Inner endpoints of lines are this distance from center.
@@ -207,9 +207,6 @@ def save() -> None:
             )
             f.write("\n")
 
-# TODO: debug
-t = open("times.csv", "w")
-
 def animate() -> None:
     """
     Animates the illusion.
@@ -224,11 +221,6 @@ def animate() -> None:
     """
     global state, frame_count, inner_radius, trial, line_length, line_angle
 
-    # TODO: debug
-    time = datetime.now().__str__().split(":")[-1]
-    t.write(time + "\n")
-    print(time)
-
     if state == STATE_START:
         canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                            text="Press [Space] to continue to block 1.",
@@ -236,7 +228,7 @@ def animate() -> None:
                            fill="black",
                            tags=["start"])
     elif state == STATE_PLAY:
-        if frame_count > PLAY_LENGTH * FRAMES_PER_SECOND:
+        if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
             state = STATE_RATE
         else:
             # canvas.delete("line")
@@ -274,10 +266,7 @@ def animate() -> None:
                            fill="black",
                            tags=["end"])
 
-    if frame_count % 3 == 1:
-        canvas.after(17, animate)
-    else:
-        canvas.after(16, animate)
+    canvas.after(10, animate)
     frame_count += 1
 
 
@@ -327,11 +316,6 @@ def handle_key(event: Event) -> None:
         if event.char in " ":
             canvas.delete("rest")
 
-            # add block 2 trials: vary line angle
-            block2 = [i for i in range(N_LINE_ANGLES)] * LEVEL_FREQ
-            shuffle(block2)
-            trials += block2
-
             # calculate optimal line length from trial 1 ratings
             sums = {length: 0 for length in LINE_LENGTHS}
             for trial_result in results:
@@ -364,9 +348,6 @@ def stop(event: Event = None):
     """
     print(stop_message)
     window.destroy()
-
-    # TODO: debug
-    t.close()
 
 
 def dismiss():
@@ -437,8 +418,13 @@ def main() -> None:
         window.bind("<Key>", handle_key)
         window.bind("<Escape>", stop)
 
+        # block 1
         trials = [i for i in range(N_LINE_LENGTHS)] * LEVEL_FREQ
         shuffle(trials)
+
+        block2 = [i for i in range(N_LINE_ANGLES)] * LEVEL_FREQ
+        shuffle(block2)
+        trials += block2
 
         state = STATE_START
         animate()
