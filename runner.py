@@ -22,12 +22,11 @@ CANVAS_WEIGHT: int = 15
 
 # NOT frames per second!
 UPDATES_PER_SECOND: int = 100
-# TODO: slower animation speed?
-# of one expansion and contraction, in frames (= 0.5 s)
-STIM_PERIOD: int = UPDATES_PER_SECOND // 2
+# of one expansion and contraction, in frames (= 1 s)
+STIM_PERIOD: int = UPDATES_PER_SECOND
 
 # number of lines to show
-N_STIM: int = 120
+N_STIM: int = 90
 # inner radius of circle of lines
 INNER_RADIUS_BASE: int = 200
 LINE_WIDTH: int = 5
@@ -40,7 +39,7 @@ N_LINE_ANGLES: int = len(LINE_ANGLES)
 
 # TODO trials only shown once for testing
 # times to show each level
-LEVEL_FREQ: int = 1
+LEVEL_FREQ: int = 3
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + " seizures for people with photosensitive epilepsy."\
@@ -66,7 +65,7 @@ STATE_RATE_EXP = 18
 
 
 # TODO play length shortened for testing
-PLAY_LENGTH = 0.25  # trial length in seconds
+PLAY_LENGTH = 5  # trial length in seconds
 
 MENU_BG: str = "#f0f0f0"
 WIDGET_BG: str = "#e0e0e0"
@@ -174,9 +173,8 @@ def get_inner(i: int) -> np.array:
     -------
     np.array rectangular vector.
     """
-    # TODO: center of the canvas, not the screen
     return pol_to_rect(inner_radius, i / N_STIM * 360)\
-        + np.array((screen_width / 2, screen_height / 2))
+        + np.array((screen_width / 2, canvas.winfo_height() / 2))
 
 
 def get_outer(i: int) -> np.array:
@@ -250,8 +248,6 @@ def save() -> None:
             f.write("\n")
 
 
-# TODO: implement
-# set `trial` to 0 when entering PHASE_LENGTH or PHASE_ANGLE
 def handle_button() -> None:
     """
     Handle presses of the [Next] button.
@@ -264,7 +260,7 @@ def handle_button() -> None:
     -------
     None.
     """
-    global phase, state, trial, frame_count, results
+    global phase, state, trial, frame_count, results, line_length
     if phase == PHASE_START:
         if state == STATE_INTRO:
             state = STATE_INTRO2
@@ -327,6 +323,7 @@ Feel free to take a short break, then press [Next] to continue to block 2.""")
                 else:
                     state = STATE_PLAY_EXP
                     start_trial()
+
     elif phase == PHASE_REST:
         phase = PHASE_ANGLE
         state = STATE_INTRO
@@ -336,6 +333,17 @@ As before, you will be shown 7 intro illusions, 7 practice illusions,
 and 3 sets of 7 experimental illusions.
 
 (Press [Next] to continue)""")
+        sums = {length: 0 for length in LINE_LENGTHS}
+        for trial_result in results:
+            sums[trial_result[0]] += trial_result[2]
+        best_sum = 0
+        best_length = 0
+        for length, sum in sums.items():
+            if sum > best_sum:
+                best_sum = sum
+                best_length = length
+        line_length = best_length
+
     elif phase == PHASE_ANGLE:
         if state == STATE_INTRO:
             state = STATE_PLAY_INTRO
@@ -399,7 +407,6 @@ def stop_trial() -> None:
         canvas.itemconfig(i, state="hidden")
     trial += 1
 
-# TODO: overhaul
 def animate() -> None:
     """
     Animates the illusion.
@@ -445,41 +452,6 @@ def animate() -> None:
             else:
                 update_stimulus()
                 frame_count += 1
-    # elif phase == PHASE_ANGLE:
-    #     pass
-    elif phase == PHASE_END:
-        pass
-    # elif state == STATE_PLAY:
-    #     if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
-    #         state = STATE_RATE
-    #     else:
-    #         # canvas.delete("line")
-
-    #         update_stimulus()
-    # elif state == STATE_RATE:
-    #     canvas.delete("play")
-    #     canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-    #                        text="Rate the illusion with a" +
-    #                        " number key from 1–7.",
-    #                        font="Arial 24 bold",
-    #                        fill="black",
-    #                        tags=["rate"])
-    # elif state == STATE_REST:
-    #     canvas.delete("play")
-    #     canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-    #                        text="This marks the end of block 1." +
-    #                        " Press [space] to move on to block 2.",
-    #                        font="Arial 24 bold",
-    #                        fill="black",
-    #                        tags=["rest"])
-    # elif state == STATE_END:
-    #     save()
-    #     canvas.delete("play")
-    #     canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-    #                        text="Your data has been saved. Press [Esc] to exit.",
-    #                        font="Arial 24 bold",
-    #                        fill="black",
-    #                        tags=["end"])
 
     canvas.after(10, animate)
 
@@ -508,8 +480,6 @@ def start_trial() -> None:
         line_length = LINE_LENGTHS[trials[trial]]
         line_angle = LINE_ANGLES[2]
     elif phase == PHASE_ANGLE:
-        # TODO: use best line length from block 1
-        line_length = LINE_LENGTHS[2]
         line_angle = LINE_ANGLES[trials[trial]]
     for i in range(N_STIM):
         line_id = canvas.create_line(
@@ -522,70 +492,6 @@ def start_trial() -> None:
         lines.append([line_id, list(get_inner(i))])
 
     frame_count = 0
-
-
-# TODO: remove
-def handle_key(event: Event) -> None:
-    """
-    Handles keypresses by the user.
-    For monitoring responses in the rate phase.
-
-    Parameters
-    ----------
-    event: Event keypress event.
-
-    Returns
-    -------
-    None
-    """
-    global state, trials, trial, frame_count, results, stop_message,\
-        line_length
-    # if state == STATE_START:
-    #     if event.char in " ":
-    #         canvas.delete("start")
-    #         state = STATE_PLAY
-    #         begin_play()
-    #         frame_count = 0
-    # elif state == STATE_RATE:
-    #     if event.char in "1234567":
-    #         if trial < N_LINE_LENGTHS * LEVEL_FREQ:
-    #             results.append((LINE_LENGTHS[trials[trial]],
-    #                             LINE_ANGLES[2], int(event.char)))
-    #         else:
-    #             results.append((line_length,
-    #                             LINE_ANGLES[trials[trial]], int(event.char)))
-    #         trial += 1
-    #         canvas.delete("rate")
-
-    #         if trial == N_LINE_LENGTHS * LEVEL_FREQ:
-    #             state = STATE_REST
-    #             return
-    #         if trial == (N_LINE_LENGTHS + N_LINE_ANGLES) * LEVEL_FREQ:
-    #             state = STATE_END
-    #             stop_message = "Experiment closed."
-    #             return
-    #         state = STATE_PLAY
-    #         begin_play()
-    #         frame_count = 0
-    # elif state == STATE_REST:
-    #     if event.char in " ":
-    #         canvas.delete("rest")
-
-    #         # calculate optimal line length from trial 1 ratings
-    #         sums = {length: 0 for length in LINE_LENGTHS}
-    #         for trial_result in results:
-    #             sums[trial_result[0]] += trial_result[2]
-    #         best_sum = 0
-    #         best_length = 0
-    #         for length, sum in sums.items():
-    #             if sum > best_sum:
-    #                 best_sum = sum
-    #                 best_length = length
-    #         line_length = best_length
-
-    #         state = STATE_PLAY
-    #         begin_play()
-    #         frame_count = 0
 
 
 def stop(event: Event = None):
@@ -725,16 +631,16 @@ def main() -> None:
         results = []
         fixation = [
             canvas.create_rectangle(screen_width / 2 - 10,
-                                    screen_height / 2 - 3,
+                                    canvas.winfo_height() / 2 - 3,
                                     screen_width / 2 + 10,
-                                    screen_height / 2 + 3,
+                                    canvas.winfo_height() / 2 + 3,
                                     fill="black", width=0,
                                     tags=["fixation", "play"],
                                     state="hidden"),
             canvas.create_rectangle(screen_width / 2 - 3,
-                                    screen_height / 2 - 10,
+                                    canvas.winfo_height() / 2 - 10,
                                     screen_width / 2 + 3,
-                                    screen_height / 2 + 10,
+                                    canvas.winfo_height() / 2 + 10,
                                     fill="black", width=0,
                                     tags=["fixation", "play"],
                                     state="hidden")
