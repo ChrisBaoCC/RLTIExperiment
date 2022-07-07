@@ -3,23 +3,26 @@
 
 __author__ = "Chris Bao"
 __version__ = "1.1"
-__date__ = "6 Jul 2022"
+__date__ = "7 Jul 2022"
 
 # IMPORTS #
 from datetime import datetime
 from math import pi, cos, sin
 from random import shuffle
+from tracemalloc import start
 from turtle import window_height
 import numpy as np
-from tkinter import HORIZONTAL, Button, Entry, Event, Frame, IntVar, Label, Scale, StringVar, Tk, Canvas,\
-    Toplevel, messagebox
+from tkinter import CENTER, HORIZONTAL, Button, Entry, Event, Frame, IntVar,\
+    Label, Scale, StringVar, Tk, Canvas, Toplevel, messagebox
 
 # CONSTANTS #
-# fraction of window height given to menubar
-MENUBAR_WINDOW_RATIO: float = 1/8
+# relative weights (sizes) of menubar and canvas
+MENU_WEIGHT: int = 1
+CANVAS_WEIGHT: int = 15
 
 # NOT frames per second!
 UPDATES_PER_SECOND: int = 100
+# TODO: slower animation speed?
 # of one expansion and contraction, in frames (= 0.5 s)
 STIM_PERIOD: int = UPDATES_PER_SECOND // 2
 
@@ -52,13 +55,29 @@ PHASE_ANGLE = 3
 PHASE_END = 4
 
 STATE_INTRO = 10
-STATE_PLAY = 11
-STATE_RATE = 12
+STATE_INTRO2 = 11
+STATE_INTRO3 = 12
+STATE_PLAY_INTRO = 13
+STATE_PLAY_PRAC = 14
+STATE_PLAY_EXP = 15
+STATE_RATE_INTRO = 16
+STATE_RATE_PRAC = 17
+STATE_RATE_EXP = 18
+
 
 # TODO play length shortened for testing
-PLAY_LENGTH = 1  # trial length in seconds
+PLAY_LENGTH = 0.25  # trial length in seconds
 
-WIDGET_FONT: tuple = ("Helvetica Neue", 16, "bold")
+MENU_BG: str = "#f0f0f0"
+WIDGET_BG: str = "#e0e0e0"
+WIDGET_ACTIVE_BG: str = "#d0d0d0"
+WIDGET_FONT: tuple = ("Helvetica Neue", 16)
+
+TEXT_ARGS: dict = {
+    "font": "Helvetica 24",
+    "fill": "black",
+    "justify": CENTER,
+}
 
 # GLOBALS #
 screen_width: int
@@ -72,10 +91,13 @@ dlg: Toplevel
 exit_btn: Button
 slider: Scale
 slider_var: IntVar
-done_btn: Button
+next_btn: Button
 
 initials_var: StringVar
 cur_time: datetime
+
+# store Canvas item id of text to display
+text: int
 
 # store Canvas item ids of fixation cross (2 rectangles)
 fixation: list[int]
@@ -87,6 +109,9 @@ line_length: int
 
 inner_radius: int
 frame_count: int
+
+# in the current trial, whether the subject has rated the illusion or not
+rated: bool
 
 # current phase of program: start, rest, end, or block.
 phase: int
@@ -101,6 +126,24 @@ results: list[tuple[int, int, int]]
 
 # gets printed to console when experiment is closed
 stop_message: str = "Experiment was closed early."
+
+
+def mark_rated(e: Event) -> None:
+    """
+    Set the current trial as having been rated and updates the text.
+
+    Parameters
+    ----------
+    e: Event given by tkinter event handler.
+
+    Returns
+    -------
+    None.
+    """
+    global rated
+    rated = True
+    if state in [STATE_RATE_PRAC, STATE_RATE_EXP]:
+        canvas.itemconfig(text, text="(Press the [Next] button to continue)")
 
 
 def pol_to_rect(r: float, theta: float) -> np.array:
@@ -131,6 +174,7 @@ def get_inner(i: int) -> np.array:
     -------
     np.array rectangular vector.
     """
+    # TODO: center of the canvas, not the screen
     return pol_to_rect(inner_radius, i / N_STIM * 360)\
         + np.array((screen_width / 2, screen_height / 2))
 
@@ -149,7 +193,7 @@ def get_outer(i: int) -> np.array:
     """
     # (stimulus line vector) + (inner endpoint vector)
     return pol_to_rect(line_length, line_angle + i / N_STIM * 360)\
-        + get_inner(i)    
+        + get_inner(i)
 
 
 def update_stimulus() -> None:
@@ -164,7 +208,11 @@ def update_stimulus() -> None:
     -------
     None
     """
-    global lines
+    global lines, inner_radius
+    if frame_count % STIM_PERIOD < STIM_PERIOD/2:
+        inner_radius += line_length * (1 / STIM_PERIOD)
+    else:
+        inner_radius -= line_length * (1 / STIM_PERIOD)
     for i in range(N_STIM):
         cur_inner = lines[i][1]
         new_inner = list(get_inner(i))
@@ -202,9 +250,11 @@ def save() -> None:
             f.write("\n")
 
 
+# TODO: implement
+# set `trial` to 0 when entering PHASE_LENGTH or PHASE_ANGLE
 def handle_button() -> None:
     """
-    Handle presses of the Done button.
+    Handle presses of the [Next] button.
 
     Parameters
     ----------
@@ -214,8 +264,140 @@ def handle_button() -> None:
     -------
     None.
     """
-    # TODO: implement
+    global phase, state, trial, frame_count, results
+    if phase == PHASE_START:
+        if state == STATE_INTRO:
+            state = STATE_INTRO2
+            canvas.itemconfig(text, text="""On the upper left is the [Exit] button. You may press this at any time
+to stop the experiment. Note that if you stop early, your results will not
+be recorded.
 
+On the upper middle is the slider, which you will use to rate the illusion
+strength over the course of the experiment.
+
+On the upper right is the [Next] button, which you will press to move
+between stages of the experiment.
+
+(Press the [Next] button to continue)""")
+        elif state == STATE_INTRO2:
+            phase = PHASE_LENGTH
+            state = STATE_INTRO
+            canvas.itemconfig(text, text="""Welcome to block 1 of the experiment. First you will be shown 7
+illusions of varying strength, but you do not need to rate them.
+
+(Press the [Next] button to continue)""")
+    elif phase == PHASE_LENGTH:
+        if state == STATE_INTRO:
+            state = STATE_PLAY_INTRO
+            trial = 0
+            start_trial()
+        elif state == STATE_RATE_INTRO:
+            if trial == N_LINE_LENGTHS:
+                state = STATE_INTRO2
+                canvas.itemconfig(text, state="normal", text="""Next, you will be shown another 7 illusions.
+You will rate these as practice for the experimental stage.""")
+            else:
+                state = STATE_PLAY_INTRO
+                start_trial()
+        elif state == STATE_INTRO2:
+            state = STATE_PLAY_PRAC
+            start_trial()
+        elif state == STATE_RATE_PRAC:
+            if rated:
+                if trial == 2 * N_LINE_LENGTHS:
+                    state = STATE_INTRO3
+                    canvas.itemconfig(text, state="normal", text="""For the final stage of this block, you will be shown 3 sets of 7 illusions.
+Your ratings for these trials will be recorded.""")
+                else:
+                    state = STATE_PLAY_PRAC
+                    start_trial()
+        elif state == STATE_INTRO3:
+            state = STATE_PLAY_EXP
+            start_trial()
+        elif state == STATE_RATE_EXP:
+            if rated:
+                results.append((line_length, line_angle, slider_var.get()))
+                if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS:
+                    phase = PHASE_REST
+                    state = STATE_INTRO
+                    canvas.itemconfig(text, state="normal", text=
+"""
+This marks the end of the first experimental block.
+Feel free to take a short break, then press [Next] to continue to block 2.""")
+                else:
+                    state = STATE_PLAY_EXP
+                    start_trial()
+    elif phase == PHASE_REST:
+        phase = PHASE_ANGLE
+        state = STATE_INTRO
+        canvas.itemconfig(text, state="normal", text=
+"""Welcome to block 2 of the experiment.
+As before, you will be shown 7 intro illusions, 7 practice illusions,
+and 3 sets of 7 experimental illusions.
+
+(Press [Next] to continue)""")
+    elif phase == PHASE_ANGLE:
+        if state == STATE_INTRO:
+            state = STATE_PLAY_INTRO
+            start_trial()
+        elif state == STATE_RATE_INTRO:
+            if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS + N_LINE_ANGLES:
+                state = STATE_INTRO2
+                canvas.itemconfig(text, state="normal", text="""Next, you will be shown another 7 illusions.
+You will rate these as practice for the experimental stage.""")
+            else:
+                state = STATE_PLAY_INTRO
+                start_trial()
+        elif state == STATE_INTRO2:
+            state = STATE_PLAY_PRAC
+            start_trial()
+        elif state == STATE_RATE_PRAC:
+            if rated:
+                if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS\
+                            + 2 * N_LINE_ANGLES:
+                    state = STATE_INTRO3
+                    canvas.itemconfig(text, state="normal", text="""For the final stage of this block, you will be shown 3 sets of 7 illusions.
+Your ratings for these trials will be recorded.""")
+                else:
+                    state = STATE_PLAY_PRAC
+                    start_trial()
+        elif state == STATE_INTRO3:
+            state = STATE_PLAY_EXP
+            start_trial()
+        elif state == STATE_RATE_EXP:
+            if rated:
+                results.append((line_length, line_angle, slider_var.get()))
+                if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS\
+                        + (2+LEVEL_FREQ) * N_LINE_ANGLES:
+                    phase = PHASE_END
+                    state = STATE_INTRO
+                    canvas.itemconfig(text, state="normal", text=
+"""
+This marks the end of the experiment. Your data has been saved.
+Press the [Exit] button to finish.""")
+                    save()
+                else:
+                    state = STATE_PLAY_EXP
+                    start_trial()
+
+
+def stop_trial() -> None:
+    """
+    Removes trial animations (stimulus and fixation) from the screen.
+
+    Parameters
+    ----------
+    None taken.
+
+    Returns
+    -------
+    None.
+    """
+    global trial
+    canvas.delete("line")
+    for i in fixation:
+        canvas.itemconfig(i, state="hidden")
+    trial += 1
 
 # TODO: overhaul
 def animate() -> None:
@@ -230,25 +412,50 @@ def animate() -> None:
     -------
     None
     """
-    global state, frame_count, inner_radius, trial, line_length, line_angle
+    global state, frame_count, inner_radius, trial, line_length,\
+        line_angle, text, rated
 
-    # if state == STATE_START:
-    #     canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-    #                        text="Press [Space] to continue to block 1.",
-    #                        font="Arial 24 bold",
-    #                        fill="black",
-    #                        tags=["start"])
+    if phase == PHASE_LENGTH or phase == PHASE_ANGLE:
+        if state == STATE_PLAY_INTRO:
+            if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
+                stop_trial()
+                state = STATE_RATE_INTRO
+                canvas.itemconfig(text, state="normal",
+                                  text="(Press the [Next] button to continue)")
+            else:
+                update_stimulus()
+                frame_count += 1
+        elif state == STATE_PLAY_PRAC:
+            if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
+                stop_trial()
+                state = STATE_RATE_PRAC
+                rated = False
+                canvas.itemconfig(text, state="normal",
+                                  text="Please rate the illusion strength with the slider.")
+            else:
+                update_stimulus()
+                frame_count += 1
+        elif state == STATE_PLAY_EXP:
+            if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
+                stop_trial()
+                state = STATE_RATE_EXP
+                rated = False
+                canvas.itemconfig(text, state="normal",
+                        text="Please rate the illusion strength with the slider.")
+            else:
+                update_stimulus()
+                frame_count += 1
+    # elif phase == PHASE_ANGLE:
+    #     pass
+    elif phase == PHASE_END:
+        pass
     # elif state == STATE_PLAY:
     #     if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
     #         state = STATE_RATE
     #     else:
     #         # canvas.delete("line")
-            
+
     #         update_stimulus()
-    #         if frame_count % STIM_PERIOD < STIM_PERIOD/2:
-    #             inner_radius += line_length * (1 / STIM_PERIOD)
-    #         else:
-    #             inner_radius -= line_length * (1 / STIM_PERIOD)
     # elif state == STATE_RATE:
     #     canvas.delete("play")
     #     canvas.create_text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
@@ -274,8 +481,7 @@ def animate() -> None:
     #                        fill="black",
     #                        tags=["end"])
 
-    # canvas.after(10, animate)
-    # frame_count += 1
+    canvas.after(10, animate)
 
 
 def start_trial() -> None:
@@ -290,14 +496,20 @@ def start_trial() -> None:
     -------
     None.
     """
-    global lines, line_length, line_angle, frame_count
+    global lines, line_length, line_angle, frame_count, inner_radius
+    inner_radius = INNER_RADIUS_BASE
+
+    canvas.itemconfig(text, state="hidden")
     for i in fixation:
         canvas.itemconfigure(i, state="normal")
-    
-    lines.clear()
-    if trial < N_LINE_LENGTHS * LEVEL_FREQ:
+
+    lines = []
+    if phase == PHASE_LENGTH:
         line_length = LINE_LENGTHS[trials[trial]]
-    elif trial >= N_LINE_LENGTHS * LEVEL_FREQ:
+        line_angle = LINE_ANGLES[2]
+    elif phase == PHASE_ANGLE:
+        # TODO: use best line length from block 1
+        line_length = LINE_LENGTHS[2]
         line_angle = LINE_ANGLES[trials[trial]]
     for i in range(N_STIM):
         line_id = canvas.create_line(
@@ -308,7 +520,7 @@ def start_trial() -> None:
             tags=["line", "play"]
         )
         lines.append([line_id, list(get_inner(i))])
-    
+
     frame_count = 0
 
 
@@ -428,15 +640,15 @@ def info_dialog() -> None:
     global dlg, initials_var
     dlg = Toplevel(window)
     dlg.title("Logging")
-    dlg.geometry("+750+500")
+    dlg.geometry("+720+500")
     dlg.resizable(False, False)
     initials_var = StringVar(dlg)
     Label(dlg, text="Please enter your initials:").pack()
     Entry(dlg, textvariable=initials_var).pack()
     Label(dlg, text="You may also close this window to exit.").pack()
     Label(dlg, text="During the experiment, you may press"
-          + " [Esc] to stop at any time.").pack()
-    Button(dlg, text="Done", command=dismiss).pack()
+          + " the [Exit] button to stop at any time.").pack()
+    Button(dlg, text="Next", command=dismiss).pack()
     dlg.protocol("WM_DELETE_WINDOW", dismiss)  # intercept close button
     dlg.transient(window)  # dialog window is related to main
     dlg.wait_visibility()  # can't grab until window appears, so we wait
@@ -458,38 +670,43 @@ def main() -> None:
     """
     global window, canvas, frame, phase, state, cur_time, fixation,\
         screen_width, screen_height, lines, results, exit_btn, slider_var,\
-        slider, done_btn
+        slider, next_btn, text, trials
     window = Tk()
     window.attributes('-fullscreen', True)
     screen_width = window.winfo_screenwidth()
     screen_height = window.winfo_screenheight()
 
-    frame = Frame(window, width=screen_width,
-                  height=screen_height*MENUBAR_WINDOW_RATIO,
-                  highlightthickness=0)
-    exit_btn = Button(frame, text="Exit", command=stop, font=WIDGET_FONT)
+    frame = Frame(window, highlightthickness=0, bg=MENU_BG)
+    exit_btn = Button(frame, text="Exit", command=stop, font=WIDGET_FONT,
+                      bg=WIDGET_BG, activebackground=WIDGET_ACTIVE_BG, relief="flat",
+                      highlightthickness=0)
     slider_var = IntVar(frame)
-    slider = Scale(frame, orient=HORIZONTAL, showvalue=0, variable=slider_var)
-    done_btn = Button(frame, text="Done", command=handle_button)
-
-    # TODO: left off here adjusting widgets
+    slider = Scale(frame, orient=HORIZONTAL, showvalue=0, variable=slider_var,
+                   length=500, width=30, bg=MENU_BG, fg="black", resolution=-1,
+                   highlightthickness=0, relief="flat", troughcolor=WIDGET_BG,
+                   activebackground=WIDGET_ACTIVE_BG, command=mark_rated)
+    next_btn = Button(frame, text="Next", command=handle_button,
+                      font=WIDGET_FONT, bg=WIDGET_BG, highlightthickness=0,
+                      activebackground=WIDGET_ACTIVE_BG, relief="flat")
 
     exit_btn.grid(row=1, column=1, sticky="nsew")
-    # slider.grid(row=1, column=3, sticky="nsew")
-    # done_btn.grid(row=1, column=5, sticky="nsew")
+    slider.grid(row=1, column=3, sticky="nsew")
+    next_btn.grid(row=1, column=5, sticky="nsew")
     for r in range(3):
         frame.rowconfigure(r, weight=1)
     for c in range(0, 7, 2):
         frame.columnconfigure(c, weight=1)
-    frame.columnconfigure(1, weight=10)
-    frame.columnconfigure(3, weight=10)
-    frame.columnconfigure(5, weight=10)
-    frame.pack()
+    frame.columnconfigure(1, weight=1)
+    frame.columnconfigure(3, weight=1)
+    frame.columnconfigure(5, weight=1)
+    frame.grid(row=0, column=0, sticky="nsew")
 
-    canvas = Canvas(window, width=screen_width,
-                    height=1 - screen_height*MENUBAR_WINDOW_RATIO,
-                    bg="white", highlightthickness=0)
-    canvas.pack()
+    canvas = Canvas(window, bg="white", highlightthickness=0)
+    canvas.grid(row=1, column=0, sticky="nsew")
+
+    window.rowconfigure(0, weight=MENU_WEIGHT)
+    window.rowconfigure(1, weight=CANVAS_WEIGHT)
+    window.columnconfigure(0, weight=1)
 
     if not messagebox.askyesno(title="Epilepsy warning",
                                message=SEIZURE_WARNING,
@@ -503,7 +720,6 @@ def main() -> None:
 
     try:
         # setup
-        # TODO: set `trial` to 0 when entering PHASE_LENGTH or PHASE_ANGLE
         phase = PHASE_START
         state = STATE_INTRO
         results = []
@@ -525,17 +741,32 @@ def main() -> None:
         ]
 
         trials = []
-        # block 1
-        for _ in range(LEVEL_FREQ):
+        # block 1; note the `+2` because of intro and practice trials
+        for _ in range(LEVEL_FREQ + 2):
             series = [i for i in range(N_LINE_LENGTHS)]
             shuffle(series)
             trials += series[:]
         # block 2
-        for _ in range(LEVEL_FREQ):
+        for _ in range(LEVEL_FREQ + 2):
             series = [i for i in range(N_LINE_ANGLES)]
             shuffle(series)
             trials += series[:]
 
+        text = canvas.create_text(screen_width / 2, screen_height / 2, text="""Welcome!
+This experiment consists of 2 blocks of 21 trials.
+In the middle you will be given a short break.
+
+At the beginning of each block, there will be 7 introduction trials.
+These are to get you familiar with various illusion strengths.
+Then will be 7 practice trials, where you will rate them accordingly.
+The ratings of practice trials do not count and will not be recorded.
+Last are the 21 experimental trials.
+These do count and the results will be recorded.
+
+Thank you for your participation!
+
+(Press the [Next] button to continue)""",
+                                  tags=["start"], **TEXT_ARGS)
         animate()
         window.mainloop()
     except:
