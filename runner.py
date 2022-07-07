@@ -31,15 +31,15 @@ N_STIM: int = 90
 INNER_RADIUS_BASE: int = 200
 LINE_WIDTH: int = 5
 
-LINE_LENGTHS: tuple[int] = (50, 75, 100, 150, 200, 250, 300)
+LINE_LENGTHS: tuple[int] = (75, 100, 125, 150, 175, 200, 225, 250, 275, 300)
 N_LINE_LENGTHS: int = len(LINE_LENGTHS)
 
-LINE_ANGLES: tuple[int] = (12, 24, 36, 48, 60, 72, 84)
+LINE_ANGLES: tuple[int] = (8, 16, 24, 32, 40, 48, 56, 64, 72, 80)
 N_LINE_ANGLES: int = len(LINE_ANGLES)
 
 # TODO trials only shown once for testing
-# times to show each level
-LEVEL_FREQ: int = 3
+# times to show each level per block
+LEVEL_REPS: int = 12
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + " seizures for people with photosensitive epilepsy."\
@@ -313,7 +313,7 @@ Your ratings for these trials will be recorded.""")
         elif state == STATE_RATE_EXP:
             if rated:
                 results.append((line_length, line_angle, slider_var.get()))
-                if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS:
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS:
                     phase = PHASE_REST
                     state = STATE_INTRO
                     canvas.itemconfig(text, state="normal", text=
@@ -349,7 +349,7 @@ and 3 sets of 7 experimental illusions.
             state = STATE_PLAY_INTRO
             start_trial()
         elif state == STATE_RATE_INTRO:
-            if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS + N_LINE_ANGLES:
+            if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS + N_LINE_ANGLES:
                 state = STATE_INTRO2
                 canvas.itemconfig(text, state="normal", text="""Next, you will be shown another 7 illusions.
 You will rate these as practice for the experimental stage.""")
@@ -361,7 +361,7 @@ You will rate these as practice for the experimental stage.""")
             start_trial()
         elif state == STATE_RATE_PRAC:
             if rated:
-                if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS\
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
                             + 2 * N_LINE_ANGLES:
                     state = STATE_INTRO3
                     canvas.itemconfig(text, state="normal", text="""For the final stage of this block, you will be shown 3 sets of 7 illusions.
@@ -375,8 +375,8 @@ Your ratings for these trials will be recorded.""")
         elif state == STATE_RATE_EXP:
             if rated:
                 results.append((line_length, line_angle, slider_var.get()))
-                if trial == (2+LEVEL_FREQ) * N_LINE_LENGTHS\
-                        + (2+LEVEL_FREQ) * N_LINE_ANGLES:
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                        + (2+LEVEL_REPS) * N_LINE_ANGLES:
                     phase = PHASE_END
                     state = STATE_INTRO
                     canvas.itemconfig(text, state="normal", text=
@@ -648,12 +648,12 @@ def main() -> None:
 
         trials = []
         # block 1; note the `+2` because of intro and practice trials
-        for _ in range(LEVEL_FREQ + 2):
+        for _ in range(LEVEL_REPS + 2):
             series = [i for i in range(N_LINE_LENGTHS)]
             shuffle(series)
             trials += series[:]
         # block 2
-        for _ in range(LEVEL_FREQ + 2):
+        for _ in range(LEVEL_REPS + 2):
             series = [i for i in range(N_LINE_ANGLES)]
             shuffle(series)
             trials += series[:]
