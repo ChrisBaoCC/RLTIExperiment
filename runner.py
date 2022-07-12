@@ -2,8 +2,8 @@
 """Python script that runs the experiment."""
 
 __author__ = "Chris Bao"
-__version__ = "1.2"
-__date__ = "11 Jul 2022"
+__version__ = "1.3"
+__date__ = "12 Jul 2022"
 
 # IMPORTS #
 from datetime import datetime
@@ -34,16 +34,31 @@ LINE_ANGLES: tuple[int] = tuple(range(8, 88, 8))
 N_LINE_ANGLES: int = len(LINE_ANGLES)
 DEFAULT_ANGLE: int = 48
 
-STIM_RADII: tuple[int] = tuple(range(100, 430, 30))
+STIM_RADII: tuple[int] = tuple(range(100, 400, 30))
 N_STIM_RADII: int = len(STIM_RADII)
 DEFAULT_RADIUS: int = 225
 
-STIM_PERIODS: tuple[int] = tuple(range(50, 160, 10))
+STIM_PERIODS: tuple[int] = tuple(range(50, 150, 10))
 N_STIM_PERIODS: int = len(STIM_PERIODS)
 DEFAULT_PERIOD: int = 100
 
+# skip lower radii to avoid Moiré effect due to intersecting lines
+# line length -> index of STIM_RADII to skip to
+MOIRE_SKIPS: dict = {
+    40: 0,
+    60: 1,
+    80: 1,
+    100: 2,
+    120: 3,
+    140: 3,
+    160: 3,
+    180: 4,
+    200: 4,
+    220: 4,
+}
+
 # trial length in seconds
-PLAY_LENGTH = 0.25  # during experiment: 5 (10 sec total with rating)
+PLAY_LENGTH = 0.1  # during experiment: 5 (10 sec total with rating)
 # times to show each level per block
 LEVEL_REPS: int = 1  # during experiment: 12 (14 total with intro/practice)
 
@@ -54,7 +69,7 @@ SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + "\n\nDo you wish to proceed?"
 
 INTRO_TEXT: str = f"""Welcome!
-This experiment consists of 4 blocks of {(LEVEL_REPS + 2) * N_LINE_LENGTHS}
+This experiment has 4 blocks of up to {(LEVEL_REPS + 2) * N_LINE_LENGTHS}
 trials. In the middle you will be given a short break.
 
 At the start of each block will be {N_LINE_LENGTHS} introduction trials.
@@ -73,7 +88,10 @@ On the upper middle is the slider, which you will use to rate the illusion
 strength over the course of the experiment.
 
 On the upper right is the [Next] button, which you will press to move between
-stages of the experiment."""
+stages of the experiment.
+
+While the illusion plays, please focus on the cross
+at the center of the screen."""
 
 LENGTH_INTRO_TEXT: str = f"""Welcome to block 1 of the experiment.
 First you will be shown {N_LINE_LENGTHS} illusions of varying strength,
@@ -163,7 +181,7 @@ line_angle: int
 # self-explanatory
 line_length: int
 # radius of circle of lines (through midpoints)
-stim_radius: int = 225
+stim_radius: int = DEFAULT_RADIUS
 # of one expansion and contraction, in frames (= 1 s)
 stim_period: int
 
@@ -302,13 +320,15 @@ def save() -> None:
     filename = "data/" + initials_var.get().lstrip().rstrip().lower()\
         + " " + cur_time.__str__() + ".csv"
     with open(filename, "w") as f:
-        f.write("trial,line_length,line_angle,rating\n")
+        f.write("trial,line_length,line_angle,stim_radius,stim_period,rating")
+        f.write("\n")
         for trial_result in enumerate(results):
             f.write(
                 ",".join(
                     [str(trial_result[0]), str(trial_result[1][0]),
                      str(trial_result[1][1]), str(trial_result[1][2]),
-                     str(trial_result[1][2]), str(trial_result[1][3])]
+                     str(trial_result[1][2]), str(trial_result[1][3]),
+                     str(trial_result[1][4])]
                 )
             )
             f.write("\n")
@@ -327,7 +347,7 @@ def handle_button() -> None:
     None.
     """
     global phase, state, trial, frame_count, results, line_length,\
-        line_angle, stim_radius, stim_period
+        line_angle, stim_radius, stim_period, trials
     if phase == PHASE_START:
         if state == STATE_INTRO:
             state = STATE_INTRO2
@@ -336,6 +356,11 @@ def handle_button() -> None:
             phase = PHASE_LENGTH
             state = STATE_INTRO
             canvas.itemconfig(text, text=LENGTH_INTRO_TEXT + NEXT_PROMPT)
+            # block 1; note the `+2` because of intro and practice trials
+            for _ in range(LEVEL_REPS + 2):
+                series = [i for i in range(N_LINE_LENGTHS)]
+                shuffle(series)
+                trials += series[:]
     elif phase == PHASE_LENGTH:
         if state == STATE_INTRO:
             state = STATE_PLAY_INTRO
@@ -392,6 +417,11 @@ def handle_button() -> None:
                     best_sum = sum
                     best_length = length
             line_length = best_length
+            # block 2
+            for _ in range(LEVEL_REPS + 2):
+                series = [i for i in range(N_LINE_ANGLES)]
+                shuffle(series)
+                trials += series[:]
         elif trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
                 + (2+LEVEL_REPS) * N_LINE_ANGLES:
             phase = PHASE_RADIUS
@@ -408,6 +438,12 @@ def handle_button() -> None:
                     best_sum = sum
                     best_angle = angle
             line_angle = best_angle
+            # block 3
+            for _ in range(LEVEL_REPS + 2):
+                series = [i for i in range(MOIRE_SKIPS[line_length],
+                                           N_STIM_RADII)]
+                shuffle(series)
+                trials += series[:]
         elif trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
                 + (2+LEVEL_REPS) * N_LINE_ANGLES\
                 + (2+LEVEL_REPS) * N_STIM_RADII:
@@ -426,6 +462,11 @@ def handle_button() -> None:
                     best_sum = sum
                     best_radius = radius
             stim_radius = best_radius
+            # block 4
+            for _ in range(LEVEL_REPS + 2):
+                series = [i for i in range(N_STIM_PERIODS)]
+                shuffle(series)
+                trials += series[:]
 
     elif phase == PHASE_ANGLE:
         if state == STATE_INTRO:
@@ -829,27 +870,6 @@ def main() -> None:
         ]
 
         trials = []
-        # block 1; note the `+2` because of intro and practice trials
-        for _ in range(LEVEL_REPS + 2):
-            series = [i for i in range(N_LINE_LENGTHS)]
-            shuffle(series)
-            trials += series[:]
-        # block 2
-        for _ in range(LEVEL_REPS + 2):
-            series = [i for i in range(N_LINE_ANGLES)]
-            shuffle(series)
-            trials += series[:]
-        # block 3
-        for _ in range(LEVEL_REPS + 2):
-            series = [i for i in range(N_STIM_RADII)]
-            shuffle(series)
-            trials += series[:]
-        # block 4
-        for _ in range(LEVEL_REPS + 2):
-            series = [i for i in range(N_STIM_PERIODS)]
-            shuffle(series)
-            trials += series[:]
-
         text = canvas.create_text(screen_width / 2, screen_height / 2,
                                   text=INTRO_TEXT + NEXT_PROMPT,
                                   tags=["start"], **TEXT_ARGS)
