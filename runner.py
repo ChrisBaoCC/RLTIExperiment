@@ -2,8 +2,8 @@
 """Python script that runs the experiment."""
 
 __author__ = "Chris Bao"
-__version__ = "1.1.1"
-__date__ = "8 Jul 2022"
+__version__ = "1.2"
+__date__ = "11 Jul 2022"
 
 # IMPORTS #
 from datetime import datetime
@@ -20,13 +20,9 @@ CANVAS_WEIGHT: int = 15
 
 # NOT frames per second!
 UPDATES_PER_SECOND: int = 100
-# of one expansion and contraction, in frames (= 1 s)
-STIM_PERIOD: int = UPDATES_PER_SECOND
 
 # number of lines to show
 N_STIM: int = 75
-# radius of circle of lines (through midpoints)
-RADIUS_BASE: int = 225
 # maximum amount of dilation/contraction
 MAX_DISPLACEMENT: int = 100
 LINE_WIDTH: int = 5
@@ -38,10 +34,18 @@ LINE_ANGLES: tuple[int] = tuple(range(8, 88, 8))
 N_LINE_ANGLES: int = len(LINE_ANGLES)
 DEFAULT_ANGLE: int = 48
 
+STIM_RADII: tuple[int] = tuple(range(100, 430, 30))
+N_STIM_RADII: int = len(STIM_RADII)
+DEFAULT_RADIUS: int = 225
+
+STIM_PERIODS: tuple[int] = tuple(range(50, 160, 10))
+N_STIM_PERIODS: int = len(STIM_PERIODS)
+DEFAULT_PERIOD: int = 100
+
 # trial length in seconds
-PLAY_LENGTH = 1 # during experiment: 5 (10 sec total with rating)
+PLAY_LENGTH = 0.25  # during experiment: 5 (10 sec total with rating)
 # times to show each level per block
-LEVEL_REPS: int = 3 # during experiment: 12 (14 total with intro/practice)
+LEVEL_REPS: int = 1  # during experiment: 12 (14 total with intro/practice)
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + " seizures for people with photosensitive epilepsy."\
@@ -50,8 +54,8 @@ SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + "\n\nDo you wish to proceed?"
 
 INTRO_TEXT: str = f"""Welcome!
-This experiment consists of 2 blocks of {(LEVEL_REPS) * N_LINE_LENGTHS} trials.
-In the middle you will be given a short break.
+This experiment consists of 4 blocks of {(LEVEL_REPS + 2) * N_LINE_LENGTHS}
+trials. In the middle you will be given a short break.
 
 At the start of each block will be {N_LINE_LENGTHS} introduction trials.
 These are to get you familiar with various illusion strengths.
@@ -78,6 +82,10 @@ ANGLE_INTRO_TEXT: str = f"""Welcome to block 2 of the experiment.
 As before, there will be {N_LINE_LENGTHS} intro illusions,
 {N_LINE_LENGTHS} practice illusions, and {LEVEL_REPS} sets of {N_LINE_LENGTHS}
 experimental illusions."""
+RADIUS_INTRO_TEXT: str = f"""Welcome to block 3 of the experiment.
+You are now midway through the experiment."""
+PERIOD_INTRO_TEXT: str = f"""Welcome to block 4 of the experiment.
+This is the last section of the experiment."""
 
 RATE_PRAC_TEXT: str = f"""Next, you will be shown another {N_LINE_LENGTHS}
 illusions. You will rate these as practice for the experimental stage.
@@ -86,8 +94,8 @@ indicates the illusion with highest strength."""
 RATE_EXP_TEXT: str = f"""For the final stage of this block, you will be shown
 {LEVEL_REPS} sets of {N_LINE_LENGTHS} illusions. Your ratings for these trials
 will be recorded."""
-REST_TEXT: str = """This marks the end of the first experimental block.
-Feel free to take a short break, then press [Next] to continue to block 2."""
+REST_TEXT: str = """This marks the end of the experimental block. Feel free to
+take a short break, then press [Next] to continue to the next section."""
 
 END_TEXT: str = """This marks the end of the experiment. Your data has been saved.
 Press the [Exit] button to finish."""
@@ -96,9 +104,11 @@ NEXT_PROMPT: str = "\n\n(Press the [Next] button to continue)"
 
 PHASE_START = 0
 PHASE_LENGTH = 1
-PHASE_REST = 2
-PHASE_ANGLE = 3
-PHASE_END = 4
+PHASE_ANGLE = 2
+PHASE_RADIUS = 3
+PHASE_PERIOD = 4
+PHASE_REST = 5
+PHASE_END = 6
 
 STATE_INTRO = 10
 STATE_INTRO2 = 11
@@ -148,8 +158,14 @@ fixation: list[int]
 # inner coords used for updating position of lines during animation
 lines: list[int, list[int]]
 
+# angle to each line from radius
 line_angle: int
+# self-explanatory
 line_length: int
+# radius of circle of lines (through midpoints)
+stim_radius: int = 225
+# of one expansion and contraction, in frames (= 1 s)
+stim_period: int
 
 radius: float
 frame_count: int
@@ -165,8 +181,8 @@ state: int
 trials: list[list[int]]
 # current trial index
 trial: int
-# line length, line angle, user rating
-results: list[tuple[int, int, int]]
+# line length, line angle, stim radius, stim period, user rating
+results: list[tuple[int, int, int, int, int]]
 
 # gets printed to console when experiment is closed
 stop_message: str = "Experiment was closed early."
@@ -221,8 +237,9 @@ def get_inner(i: int) -> np.array:
     """
     # (center of screen) + (radius vector) - 1/2 (line vector)
     return np.array((screen_width / 2, canvas.winfo_height() / 2))\
-            + pol_to_rect(radius, i / N_STIM * 360)\
-            - pol_to_rect(line_length, line_angle + i / N_STIM * 360) * 0.5
+        + pol_to_rect(radius, i / N_STIM * 360)\
+        - pol_to_rect(line_length, line_angle + i / N_STIM * 360) * 0.5
+
 
 def get_outer(i: int) -> np.array:
     """
@@ -238,9 +255,9 @@ def get_outer(i: int) -> np.array:
     """
     # (center of screen) + (radius vector) + 1/2 (line vector)
     return np.array((screen_width / 2, canvas.winfo_height() / 2))\
-            + pol_to_rect(radius, i / N_STIM * 360)\
-            + pol_to_rect(line_length, line_angle + i / N_STIM * 360) * 0.5
-    
+        + pol_to_rect(radius, i / N_STIM * 360)\
+        + pol_to_rect(line_length, line_angle + i / N_STIM * 360) * 0.5
+
 
 def update_stimulus() -> None:
     """
@@ -255,10 +272,10 @@ def update_stimulus() -> None:
     None
     """
     global lines, radius
-    if frame_count % STIM_PERIOD < STIM_PERIOD/2:
-        radius += MAX_DISPLACEMENT * (2 / STIM_PERIOD)
+    if frame_count % stim_period < stim_period/2:
+        radius += MAX_DISPLACEMENT * (2 / stim_period)
     else:
-        radius -= MAX_DISPLACEMENT * (2 / STIM_PERIOD)
+        radius -= MAX_DISPLACEMENT * (2 / stim_period)
     for i in range(N_STIM):
         cur_inner = lines[i][1]
         new_inner = list(get_inner(i))
@@ -290,7 +307,8 @@ def save() -> None:
             f.write(
                 ",".join(
                     [str(trial_result[0]), str(trial_result[1][0]),
-                     str(trial_result[1][1]), str(trial_result[1][2])]
+                     str(trial_result[1][1]), str(trial_result[1][2]),
+                     str(trial_result[1][2]), str(trial_result[1][3])]
                 )
             )
             f.write("\n")
@@ -308,7 +326,8 @@ def handle_button() -> None:
     -------
     None.
     """
-    global phase, state, trial, frame_count, results, line_length
+    global phase, state, trial, frame_count, results, line_length,\
+        line_angle, stim_radius, stim_period
     if phase == PHASE_START:
         if state == STATE_INTRO:
             state = STATE_INTRO2
@@ -347,7 +366,8 @@ def handle_button() -> None:
             start_trial()
         elif state == STATE_RATE_EXP:
             if rated:
-                results.append((line_length, line_angle, slider_var.get()))
+                results.append((line_length, line_angle, stim_radius,
+                                stim_period, slider_var.get()))
                 if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS:
                     phase = PHASE_REST
                     state = STATE_INTRO
@@ -357,20 +377,55 @@ def handle_button() -> None:
                     start_trial()
 
     elif phase == PHASE_REST:
-        phase = PHASE_ANGLE
-        state = STATE_INTRO
-        canvas.itemconfig(text, state="normal", text=ANGLE_INTRO_TEXT
-                          + NEXT_PROMPT)
-        sums = {length: 0 for length in LINE_LENGTHS}
-        for trial_result in results:
-            sums[trial_result[0]] += trial_result[2]
-        best_sum = 0
-        best_length = 0
-        for length, sum in sums.items():
-            if sum > best_sum:
-                best_sum = sum
-                best_length = length
-        line_length = best_length
+        if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS:
+            phase = PHASE_ANGLE
+            state = STATE_INTRO
+            canvas.itemconfig(text, state="normal", text=ANGLE_INTRO_TEXT
+                              + NEXT_PROMPT)
+            sums = {length: 0 for length in LINE_LENGTHS}
+            for trial_result in results:
+                sums[trial_result[0]] += trial_result[4]
+            best_sum = 0
+            best_length = 0
+            for length, sum in sums.items():
+                if sum > best_sum:
+                    best_sum = sum
+                    best_length = length
+            line_length = best_length
+        elif trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                + (2+LEVEL_REPS) * N_LINE_ANGLES:
+            phase = PHASE_RADIUS
+            state = STATE_INTRO
+            canvas.itemconfig(text, state="normal", text=RADIUS_INTRO_TEXT
+                              + NEXT_PROMPT)
+            sums = {angle: 0 for angle in LINE_ANGLES}
+            for trial_result in results[LEVEL_REPS*N_LINE_ANGLES:]:
+                sums[trial_result[1]] += trial_result[4]
+            best_sum = 0
+            best_angle = 0
+            for angle, sum in sums.items():
+                if sum > best_sum:
+                    best_sum = sum
+                    best_angle = angle
+            line_angle = best_angle
+        elif trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                + (2+LEVEL_REPS) * N_STIM_RADII:
+            phase = PHASE_PERIOD
+            state = STATE_INTRO
+            canvas.itemconfig(text, state="normal", text=PERIOD_INTRO_TEXT
+                              + NEXT_PROMPT)
+            sums = {radius: 0 for radius in STIM_RADII}
+            for trial_result in results[(LEVEL_REPS)*N_LINE_LENGTHS
+                                        + (LEVEL_REPS)*N_LINE_ANGLES:]:
+                sums[trial_result[2]] += trial_result[4]
+            best_sum = 0
+            best_radius = 0
+            for radius, sum in sums.items():
+                if sum > best_sum:
+                    best_sum = sum
+                    best_radius = radius
+            stim_radius = best_radius
 
     elif phase == PHASE_ANGLE:
         if state == STATE_INTRO:
@@ -402,13 +457,107 @@ def handle_button() -> None:
             start_trial()
         elif state == STATE_RATE_EXP:
             if rated:
-                results.append((line_length, line_angle, slider_var.get()))
+                results.append((line_length, line_angle, stim_radius,
+                                stim_period, slider_var.get()))
                 if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
                         + (2+LEVEL_REPS) * N_LINE_ANGLES:
+                    phase = PHASE_REST
+                    state = STATE_INTRO
+                    canvas.itemconfig(text, state="normal", text=REST_TEXT)
+                else:
+                    state = STATE_PLAY_EXP
+                    start_trial()
+
+    elif phase == PHASE_RADIUS:
+        if state == STATE_INTRO:
+            state = STATE_PLAY_INTRO
+            start_trial()
+        elif state == STATE_RATE_INTRO:
+            if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                    + N_STIM_RADII:
+                state = STATE_INTRO2
+                canvas.itemconfig(text, state="normal", text=RATE_PRAC_TEXT
+                                  + NEXT_PROMPT)
+            else:
+                state = STATE_PLAY_INTRO
+                start_trial()
+        elif state == STATE_INTRO2:
+            state = STATE_PLAY_PRAC
+            start_trial()
+        elif state == STATE_RATE_PRAC:
+            if rated:
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                        + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                        + 2 * N_STIM_RADII:
+                    state = STATE_INTRO3
+                    canvas.itemconfig(text, state="normal", text=RATE_EXP_TEXT
+                                      + NEXT_PROMPT)
+                else:
+                    state = STATE_PLAY_PRAC
+                    start_trial()
+        elif state == STATE_INTRO3:
+            state = STATE_PLAY_EXP
+            start_trial()
+        elif state == STATE_RATE_EXP:
+            if rated:
+                results.append((line_length, line_angle, stim_radius,
+                                stim_period, slider_var.get()))
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                        + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                        + (2+LEVEL_REPS) * N_STIM_RADII:
+                    phase = PHASE_REST
+                    state = STATE_INTRO
+                    canvas.itemconfig(text, state="normal", text=REST_TEXT)
+                else:
+                    state = STATE_PLAY_EXP
+                    start_trial()
+
+    elif phase == PHASE_PERIOD:
+        if state == STATE_INTRO:
+            state = STATE_PLAY_INTRO
+            start_trial()
+        elif state == STATE_RATE_INTRO:
+            if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                + (2+LEVEL_REPS) * N_STIM_RADII\
+                    + N_STIM_PERIODS:
+                state = STATE_INTRO2
+                canvas.itemconfig(text, state="normal", text=RATE_PRAC_TEXT
+                                  + NEXT_PROMPT)
+            else:
+                state = STATE_PLAY_INTRO
+                start_trial()
+        elif state == STATE_INTRO2:
+            state = STATE_PLAY_PRAC
+            start_trial()
+        elif state == STATE_RATE_PRAC:
+            if rated:
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                        + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                        + (2+LEVEL_REPS) * N_STIM_RADII\
+                        + 2 * N_STIM_PERIODS:
+                    state = STATE_INTRO3
+                    canvas.itemconfig(text, state="normal", text=RATE_EXP_TEXT
+                                      + NEXT_PROMPT)
+                else:
+                    state = STATE_PLAY_PRAC
+                    start_trial()
+        elif state == STATE_INTRO3:
+            state = STATE_PLAY_EXP
+            start_trial()
+        elif state == STATE_RATE_EXP:
+            if rated:
+                results.append((line_length, line_angle, stim_radius,
+                                stim_period, slider_var.get()))
+                if trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
+                        + (2+LEVEL_REPS) * N_LINE_ANGLES\
+                        + (2+LEVEL_REPS) * N_STIM_RADII\
+                        + (2+LEVEL_REPS) * N_STIM_PERIODS:
                     phase = PHASE_END
                     state = STATE_INTRO
-                    canvas.itemconfig(text, state="normal", text=END_TEXT)
                     save()
+                    canvas.itemconfig(text, state="normal", text=END_TEXT)
                 else:
                     state = STATE_PLAY_EXP
                     start_trial()
@@ -448,7 +597,7 @@ def animate() -> None:
     global state, frame_count, radius, trial, line_length,\
         line_angle, text, rated
 
-    if phase == PHASE_LENGTH or phase == PHASE_ANGLE:
+    if phase in [PHASE_LENGTH, PHASE_ANGLE, PHASE_RADIUS, PHASE_PERIOD]:
         if state == STATE_PLAY_INTRO:
             if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
                 stop_trial()
@@ -494,8 +643,9 @@ def start_trial() -> None:
     -------
     None.
     """
-    global lines, line_length, line_angle, frame_count, radius
-    radius = RADIUS_BASE
+    global lines, line_length, line_angle, frame_count, radius, stim_radius,\
+        stim_period
+    radius = stim_radius
 
     canvas.itemconfig(text, state="hidden")
     for i in fixation:
@@ -505,8 +655,14 @@ def start_trial() -> None:
     if phase == PHASE_LENGTH:
         line_length = LINE_LENGTHS[trials[trial]]
         line_angle = DEFAULT_ANGLE
+        stim_radius = DEFAULT_RADIUS
+        stim_period = DEFAULT_PERIOD
     elif phase == PHASE_ANGLE:
         line_angle = LINE_ANGLES[trials[trial]]
+    elif phase == PHASE_RADIUS:
+        stim_radius = STIM_RADII[trials[trial]]
+    elif phase == PHASE_PERIOD:
+        stim_period = STIM_PERIODS[trials[trial]]
     for i in range(N_STIM):
         line_id = canvas.create_line(
             *get_inner(i),
@@ -520,14 +676,14 @@ def start_trial() -> None:
     frame_count = 0
 
 
-def stop(event: Event = None):
+def stop(_: Event = None):
     """
     Stop the experiment.
     Note: does not log data!
 
     Parameters
     ----------
-    event: Event given by tkinter event handler. Ignored.
+    _: Event given by tkinter event handler. Ignored.
 
     Returns
     -------
@@ -681,6 +837,16 @@ def main() -> None:
         # block 2
         for _ in range(LEVEL_REPS + 2):
             series = [i for i in range(N_LINE_ANGLES)]
+            shuffle(series)
+            trials += series[:]
+        # block 3
+        for _ in range(LEVEL_REPS + 2):
+            series = [i for i in range(N_STIM_RADII)]
+            shuffle(series)
+            trials += series[:]
+        # block 4
+        for _ in range(LEVEL_REPS + 2):
+            series = [i for i in range(N_STIM_PERIODS)]
             shuffle(series)
             trials += series[:]
 
