@@ -58,9 +58,9 @@ MOIRE_SKIPS: dict = {
 }
 
 # trial length in seconds
-PLAY_LENGTH = 0.1  # during experiment: 5 (10 sec total with rating)
+PLAY_LENGTH = 1  # during experiment: 5 (10 sec total with rating)
 # times to show each level per block
-LEVEL_REPS: int = 1  # during experiment: 12 (14 total with intro/practice)
+LEVEL_REPS: int = 3  # during experiment: 12 (14 total with intro/practice)
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + " seizures for people with photosensitive epilepsy."\
@@ -94,24 +94,24 @@ While the illusion plays, please focus on the cross
 at the center of the screen."""
 
 LENGTH_INTRO_TEXT: str = f"""Welcome to block 1 of the experiment.
-First you will be shown {N_LINE_LENGTHS} illusions of varying strength,
+First you will be shown up to {N_LINE_LENGTHS} illusions of varying strength,
 but you do not need to rate them."""
 ANGLE_INTRO_TEXT: str = f"""Welcome to block 2 of the experiment.
-As before, there will be {N_LINE_LENGTHS} intro illusions,
-{N_LINE_LENGTHS} practice illusions, and {LEVEL_REPS} sets of {N_LINE_LENGTHS}
-experimental illusions."""
+As before, there will be up to {N_LINE_LENGTHS} intro illusions,
+up to {N_LINE_LENGTHS} practice illusions, and {LEVEL_REPS} sets of up to
+{N_LINE_LENGTHS} experimental illusions."""
 RADIUS_INTRO_TEXT: str = f"""Welcome to block 3 of the experiment.
 You are now midway through the experiment."""
 PERIOD_INTRO_TEXT: str = f"""Welcome to block 4 of the experiment.
 This is the last section of the experiment."""
 
-RATE_PRAC_TEXT: str = f"""Next, you will be shown another {N_LINE_LENGTHS}
-illusions. You will rate these as practice for the experimental stage.
-A rating of 0 indicates no illusion strength, while a rating of 100
-indicates the illusion with highest strength."""
+RATE_PRAC_TEXT: str = f"""Next, you will be shown up to another
+{N_LINE_LENGTHS} illusions. You will rate these as practice for the
+experimental stage. A rating of 0 indicates no illusion strength, while a
+rating of 100 indicates the illusion with highest strength."""
 RATE_EXP_TEXT: str = f"""For the final stage of this block, you will be shown
-{LEVEL_REPS} sets of {N_LINE_LENGTHS} illusions. Your ratings for these trials
-will be recorded."""
+{LEVEL_REPS} sets of up to {N_LINE_LENGTHS} illusions. Your ratings for these
+trials will be recorded."""
 REST_TEXT: str = """This marks the end of the experimental block. Feel free to
 take a short break, then press [Next] to continue to the next section."""
 
@@ -327,8 +327,7 @@ def save() -> None:
                 ",".join(
                     [str(trial_result[0]), str(trial_result[1][0]),
                      str(trial_result[1][1]), str(trial_result[1][2]),
-                     str(trial_result[1][2]), str(trial_result[1][3]),
-                     str(trial_result[1][4])]
+                     str(trial_result[1][3]), str(trial_result[1][4])]
                 )
             )
             f.write("\n")
@@ -347,7 +346,7 @@ def handle_button() -> None:
     None.
     """
     global phase, state, trial, frame_count, results, line_length,\
-        line_angle, stim_radius, stim_period, trials
+        line_angle, stim_radius, stim_period, trials, STIM_RADII, N_STIM_RADII
     if phase == PHASE_START:
         if state == STATE_INTRO:
             state = STATE_INTRO2
@@ -439,9 +438,10 @@ def handle_button() -> None:
                     best_angle = angle
             line_angle = best_angle
             # block 3
+            STIM_RADII = STIM_RADII[MOIRE_SKIPS[line_length]: ]
+            N_STIM_RADII = len(STIM_RADII)
             for _ in range(LEVEL_REPS + 2):
-                series = [i for i in range(MOIRE_SKIPS[line_length],
-                                           N_STIM_RADII)]
+                series = [i for i in range(N_STIM_RADII)]
                 shuffle(series)
                 trials += series[:]
         elif trial == (2+LEVEL_REPS) * N_LINE_LENGTHS\
