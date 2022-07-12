@@ -38,7 +38,7 @@ STIM_RADII: tuple[int] = tuple(range(100, 400, 30))
 N_STIM_RADII: int = len(STIM_RADII)
 DEFAULT_RADIUS: int = 225
 
-STIM_PERIODS: tuple[int] = tuple(range(50, 150, 10))
+STIM_PERIODS: tuple[int] = tuple(range(18, 198, 18))
 N_STIM_PERIODS: int = len(STIM_PERIODS)
 DEFAULT_PERIOD: int = 100
 
@@ -58,7 +58,7 @@ MOIRE_SKIPS: dict = {
 }
 
 # trial length in seconds
-PLAY_LENGTH = 1  # during experiment: 5 (10 sec total with rating)
+PLAY_LENGTH = 2.5 # during experiment: 5 (10 sec total with rating)
 # times to show each level per block
 LEVEL_REPS: int = 3  # during experiment: 12 (14 total with intro/practice)
 
