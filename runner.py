@@ -85,12 +85,18 @@ this at any time to stop the experiment. Note that if you stop early, your
 results will NOT be recorded.
 
 On the upper middle is the slider, which you will use to rate the illusion
-strength over the course of the experiment.
+strength over the course of the experiment. For practice and experimental
+trials, you will need to move the slider to move to the next trial.
 
 On the upper right is the [Next] button, which you will press to move between
 stages of the experiment.
+"""
+INTRO_TEXT3: str = """The illusion we are exploring here is called the
+Rotating Tilted Lines Illusion, or RLTI. As the circle of lines expands and
+contracts, it may seem to rotate. You will be rating various illusions
+on their relative strengths.
 
-While the illusion plays, please focus on the cross
+While the illusion plays, please keep your eyes on the cross
 at the center of the screen."""
 
 LENGTH_INTRO_TEXT: str = f"""Welcome to block 1 of the experiment.
@@ -352,6 +358,9 @@ def handle_button() -> None:
             state = STATE_INTRO2
             canvas.itemconfig(text, text=INTRO_TEXT2 + NEXT_PROMPT)
         elif state == STATE_INTRO2:
+            state = STATE_INTRO3
+            canvas.itemconfig(text, text=INTRO_TEXT3 + NEXT_PROMPT)
+        elif state == STATE_INTRO3:
             phase = PHASE_LENGTH
             state = STATE_INTRO
             canvas.itemconfig(text, text=LENGTH_INTRO_TEXT + NEXT_PROMPT)
