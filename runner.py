@@ -2,7 +2,7 @@
 """Python script that runs the experiment."""
 
 __author__ = "Chris Bao"
-__version__ = "1.3"
+__version__ = "1.3.1"
 __date__ = "12 Jul 2022"
 
 # IMPORTS #
@@ -36,7 +36,7 @@ DEFAULT_ANGLE: int = 48
 
 STIM_RADII: tuple[int] = tuple(range(100, 400, 30))
 N_STIM_RADII: int = len(STIM_RADII)
-DEFAULT_RADIUS: int = 225
+DEFAULT_RADIUS: int = 220
 
 STIM_PERIODS: tuple[int] = tuple(range(18, 198, 18))
 N_STIM_PERIODS: int = len(STIM_PERIODS)
@@ -58,9 +58,9 @@ MOIRE_SKIPS: dict = {
 }
 
 # trial length in seconds
-PLAY_LENGTH = 2.5 # during experiment: 5 (10 sec total with rating)
+PLAY_LENGTH: float = 5
 # times to show each level per block
-LEVEL_REPS: int = 3  # during experiment: 12 (14 total with intro/practice)
+LEVEL_REPS: int = 15
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + " seizures for people with photosensitive epilepsy."\
@@ -121,8 +121,8 @@ trials will be recorded."""
 REST_TEXT: str = """This marks the end of the experimental block. Feel free to
 take a short break, then press [Next] to continue to the next section."""
 
-END_TEXT: str = """This marks the end of the experiment. Your data has been saved.
-Press the [Exit] button to finish."""
+END_TEXT: str = """This marks the end of the experiment. Your data has been
+saved. Press the [Exit] button to finish."""
 
 NEXT_PROMPT: str = "\n\n(Press the [Next] button to continue)"
 
@@ -447,7 +447,7 @@ def handle_button() -> None:
                     best_angle = angle
             line_angle = best_angle
             # block 3
-            STIM_RADII = STIM_RADII[MOIRE_SKIPS[line_length]: ]
+            STIM_RADII = STIM_RADII[MOIRE_SKIPS[line_length]:]
             N_STIM_RADII = len(STIM_RADII)
             for _ in range(LEVEL_REPS + 2):
                 series = [i for i in range(N_STIM_RADII)]
@@ -663,7 +663,8 @@ def animate() -> None:
                 state = STATE_RATE_PRAC
                 rated = False
                 canvas.itemconfig(text, state="normal",
-                                  text="Please rate the illusion strength with the slider.")
+                                  text="Please rate the illusion strength"
+                                  + " with the slider.")
             else:
                 update_stimulus()
                 frame_count += 1
@@ -673,7 +674,8 @@ def animate() -> None:
                 state = STATE_RATE_EXP
                 rated = False
                 canvas.itemconfig(text, state="normal",
-                                  text="Please rate the illusion strength with the slider.")
+                                  text="Please rate the illusion strength"
+                                  + " with the slider.")
             else:
                 update_stimulus()
                 frame_count += 1
@@ -816,13 +818,14 @@ def main() -> None:
 
     frame = Frame(window, highlightthickness=0, bg=MENU_BG)
     exit_btn = Button(frame, text="Exit", command=stop, font=WIDGET_FONT,
-                      bg=WIDGET_BG, activebackground=WIDGET_ACTIVE_BG, relief="flat",
-                      highlightthickness=0)
+                      bg=WIDGET_BG, activebackground=WIDGET_ACTIVE_BG,
+                      relief="flat", highlightthickness=0)
     slider_var = IntVar(frame)
     slider = Scale(frame, orient=HORIZONTAL, showvalue=0, variable=slider_var,
-                   length=500, width=30, bg=MENU_BG, fg="black", resolution=-1,
-                   highlightthickness=0, relief="flat", troughcolor=WIDGET_BG,
-                   activebackground=WIDGET_ACTIVE_BG, command=mark_rated)
+                   length=500, width=30, bg=MENU_BG, fg="black",
+                   resolution=-1, highlightthickness=0, relief="flat",
+                   troughcolor=WIDGET_BG, activebackground=WIDGET_ACTIVE_BG,
+                   command=mark_rated)
     next_btn = Button(frame, text="Next", command=handle_button,
                       font=WIDGET_FONT, bg=WIDGET_BG, highlightthickness=0,
                       activebackground=WIDGET_ACTIVE_BG, relief="flat")
