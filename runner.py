@@ -2,7 +2,7 @@
 """Python script that runs the experiment."""
 
 __author__ = "Chris Bao"
-__version__ = "1.3.1"
+__version__ = "1.5"
 __date__ = "12 Jul 2022"
 
 # IMPORTS #
@@ -27,20 +27,26 @@ N_STIM: int = 75
 MAX_DISPLACEMENT: int = 100
 LINE_WIDTH: int = 5
 
-LINE_LENGTHS: tuple[int] = tuple(range(40, 240, 20))
+# note that i've commented out the versions declaring variables
+# to be lists because it won't compile in earlier versions of Python
+# LINE_LENGTHS: tuple[int] = tuple(range(40, 240, 20))
+LINE_LENGTHS = tuple(range(40, 240, 20))
 N_LINE_LENGTHS: int = len(LINE_LENGTHS)
 
-LINE_ANGLES: tuple[int] = tuple(range(8, 88, 8))
+# LINE_ANGLES: tuple[int] = tuple(range(8, 88, 8))
+LINE_ANGLES = tuple(range(8, 88, 8))
 N_LINE_ANGLES: int = len(LINE_ANGLES)
 DEFAULT_ANGLE: int = 48
 
-STIM_RADII: tuple[int] = tuple(range(100, 400, 30))
+# STIM_RADII: tuple[int] = tuple(range(100, 400, 30))
+STIM_RADII = tuple(range(100, 400, 30))
 N_STIM_RADII: int = len(STIM_RADII)
 DEFAULT_RADIUS: int = 220
 
-STIM_PERIODS: tuple[int] = tuple(range(18, 198, 18))
+# STIM_PERIODS: tuple[int] = tuple(range(18, 198, 18))
+STIM_PERIODS = tuple(range(18, 198, 18))
 N_STIM_PERIODS: int = len(STIM_PERIODS)
-DEFAULT_PERIOD: int = 100
+DEFAULT_PERIOD: int = 108
 
 # skip lower radii to avoid Moiré effect due to intersecting lines
 # line length -> index of STIM_RADII to skip to
@@ -58,9 +64,11 @@ MOIRE_SKIPS: dict = {
 }
 
 # trial length in seconds
-PLAY_LENGTH: float = 5
+# NOTE: lab computer is slower (90% speed), so 3.6 s -> 4 s.
+# actual periods are 10/9ths what they're recorded as.
+PLAY_LENGTH: float = 2.7 # new value? old is 3.6
 # times to show each level per block
-LEVEL_REPS: int = 15
+LEVEL_REPS: int = 10
 
 SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
     + " seizures for people with photosensitive epilepsy."\
@@ -94,27 +102,36 @@ stages of the experiment.
 INTRO_TEXT3: str = """The illusion we are exploring here is called the
 Rotating Tilted Lines Illusion, or RLTI. As the circle of lines expands and
 contracts, it may seem to rotate. You will be rating various illusions
-on their relative strengths.
+on their relative strengths. A stronger illusion is one with a faster
+rotation effect.
 
 While the illusion plays, please keep your eyes on the cross
 at the center of the screen."""
 
 LENGTH_INTRO_TEXT: str = f"""Welcome to block 1 of the experiment.
 First you will be shown up to {N_LINE_LENGTHS} illusions of varying strength,
-but you do not need to rate them."""
+but you do not need to rate them.
+
+Try to develop an ordering in your head of how strong the illusions are
+compared to each other. This will help when you rate them later."""
 ANGLE_INTRO_TEXT: str = f"""Welcome to block 2 of the experiment.
-As before, there will be up to {N_LINE_LENGTHS} intro illusions,
-up to {N_LINE_LENGTHS} practice illusions, and {LEVEL_REPS} sets of up to
-{N_LINE_LENGTHS} experimental illusions."""
-RADIUS_INTRO_TEXT: str = f"""Welcome to block 3 of the experiment.
-You are now midway through the experiment."""
-PERIOD_INTRO_TEXT: str = f"""Welcome to block 4 of the experiment.
-This is the last section of the experiment."""
+As before, there will be up to {N_LINE_ANGLES} intro illusions,
+which you will not need to rate."""
+RADIUS_INTRO_TEXT: str = f"""Welcome to block 3, midway through
+the experiment. As before, there will be up to {N_STIM_RADII} illusions,
+which you will not read to rate."""
+PERIOD_INTRO_TEXT: str = f"""Welcome to block 4, the last section of
+the experiment. As before, there will be up to {N_STIM_PERIODS} illusions,
+which you will not read to rate."""
 
 RATE_PRAC_TEXT: str = f"""Next, you will be shown up to another
 {N_LINE_LENGTHS} illusions. You will rate these as practice for the
-experimental stage. A rating of 0 indicates no illusion strength, while a
-rating of 100 indicates the illusion with highest strength."""
+experimental stage.
+
+A rating of 0 indicates no illusion strength, while a
+rating of 100 indicates the illusion with highest strength you've seen in
+this series. Try to come up with an order in your head of roughly how strong
+each illusion is."""
 RATE_EXP_TEXT: str = f"""For the final stage of this block, you will be shown
 {LEVEL_REPS} sets of up to {N_LINE_LENGTHS} illusions. Your ratings for these
 trials will be recorded."""
@@ -176,11 +193,13 @@ cur_time: datetime
 text: int
 
 # store Canvas item ids of fixation cross (2 rectangles)
-fixation: list[int]
+# fixation: list[int]
+fixation = []
 
 # [canvas id, [inner_x, inner_y]]
 # inner coords used for updating position of lines during animation
-lines: list[int, list[int]]
+# lines: list[int, list[int]]
+lines = []
 
 # angle to each line from radius
 line_angle: int
@@ -202,11 +221,13 @@ phase: int
 # current state of program: what is being animated.
 state: int
 # stores index of line length, angle to use for each trial
-trials: list[list[int]]
+# trials: list[list[int]]
+trials = []
 # current trial index
 trial: int
 # line length, line angle, stim radius, stim period, user rating
-results: list[tuple[int, int, int, int, int]]
+# results: list[tuple[int, int, int, int, int]]
+results = []
 
 # gets printed to console when experiment is closed
 stop_message: str = "Experiment was closed early."
@@ -323,8 +344,9 @@ def save() -> None:
     -------
     None.
     """
-    filename = "data/" + initials_var.get().lstrip().rstrip().lower()\
-        + " " + cur_time.__str__() + ".csv"
+    filename = "data/" + initials_var.get().lower()\
+        + cur_time.__str__() + ".csv"
+    filename = filename.replace(" ", "").replace(":", "-")
     with open(filename, "w") as f:
         f.write("trial,line_length,line_angle,stim_radius,stim_period,rating")
         f.write("\n")
@@ -661,10 +683,13 @@ def animate() -> None:
             if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
                 stop_trial()
                 state = STATE_RATE_PRAC
-                rated = False
-                canvas.itemconfig(text, state="normal",
-                                  text="Please rate the illusion strength"
-                                  + " with the slider.")
+                if not rated:
+                    canvas.itemconfig(text, state="normal",
+                                    text="Please rate the illusion strength"
+                                    + " with the slider.")
+                else:
+                    canvas.itemconfig(text, state="normal",
+                                    text="(Press the [Next] button to continue)")
             else:
                 update_stimulus()
                 frame_count += 1
@@ -672,10 +697,13 @@ def animate() -> None:
             if frame_count > PLAY_LENGTH * UPDATES_PER_SECOND:
                 stop_trial()
                 state = STATE_RATE_EXP
-                rated = False
-                canvas.itemconfig(text, state="normal",
-                                  text="Please rate the illusion strength"
-                                  + " with the slider.")
+                if not rated:
+                    canvas.itemconfig(text, state="normal",
+                                    text="Please rate the illusion strength"
+                                    + " with the slider.")
+                else:
+                    canvas.itemconfig(text, state="normal",
+                                    text="(Press the [Next] button to continue)")
             else:
                 update_stimulus()
                 frame_count += 1
@@ -696,7 +724,7 @@ def start_trial() -> None:
     None.
     """
     global lines, line_length, line_angle, frame_count, radius, stim_radius,\
-        stim_period
+        stim_period, rated
     radius = stim_radius
 
     canvas.itemconfig(text, state="hidden")
@@ -726,12 +754,12 @@ def start_trial() -> None:
         lines.append([line_id, list(get_inner(i))])
 
     frame_count = 0
+    rated = False
 
 
 def stop(_: Event = None):
     """
     Stop the experiment.
-    Note: does not log data!
 
     Parameters
     ----------
