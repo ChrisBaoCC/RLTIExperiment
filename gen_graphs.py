@@ -48,4 +48,10 @@ def plot(path: str, reps: int, levels: list[int], period_adj: float):
     plt.tight_layout()
     plt.show()
 
+    print("Best:")
+    for i in range(len(blocks)):
+        print(keys[i][ratings[i].argsort()[-1]])
+
 plot("data/ss2022-07-1511-06-13.775862.csv", reps=10, levels=[10, 10, 6, 10], period_adj=10/9)
+plot("data/me.csv", reps=3, levels=[10, 10, 6, 10], period_adj=10/9)
+plot("data/ec2022-07-1513-01-53.549794.csv", reps=10, levels=[10, 10, 6, 10], period_adj=10/9)

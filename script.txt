@@ -1,0 +1,66 @@
+Welcome!
+
+This experiment has 5 blocks of 125 trials.
+Between blocks, you will be given a short break.
+
+The first block will be made up of practice trials. These are to get you
+familiar with various illusion types and strengths. After each animation
+plays, you will be given a chance to rate them. However, for the first block,
+the ratings will not be recorded.
+
+Each block after that will be experimental trials. Again, the animation will
+play and you will rate each. The ratings for these trials will count and
+will be recorded.
+
+Thank you for your participation!
+===
+Controls
+
+On the upper left is the [Exit] button. You may press
+this at any time to stop the experiment. Note that if you stop early, your
+results will NOT be recorded.
+
+On the upper middle is the slider, which you will use to rate the illusion
+strength throughout the experiment. You will need to
+move the slider to finish each trial.
+
+On the upper right is the [Next] button, which you will press to move between
+stages of the experiment.
+===
+About the illusion
+
+The illusion we are exploring here is called the Rotating Tilted Lines
+Illusion, or RLTI. As the circle of lines expands and contracts, it may
+seem to rotate. You will be rating various illusions on their relative
+strengths. A stronger illusion is one with a faster, more noticeable
+rotation effect.
+
+While the illusion plays, please keep your eyes on the cross
+at the center of the screen.
+===
+Practice block
+
+Welcome to the practice block, made up of 125 trials.
+As you rate the illusions, try to develop an ordering in your head of
+how strong the they are compared to each other.
+===
+Experimental block
+
+Welcome to an experimental block, made up of 125 trials.
+Remember to keep a general order of strength in mind.
+===
+Break
+
+This marks the end of the block. Feel free to take a short break,
+then press [Next] to continue to the next section.
+===
+End
+
+This marks the end of the experiment. Your data has been
+saved. Press the [Exit] button to finish.
+===
+
+(Press the [Next] button to continue)
+===
+Please rate the illusion strength with the slider.
+0 (far left) is no rotation, 100 (far right) is the highest you've seen.
