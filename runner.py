@@ -2,8 +2,8 @@
 """Python script that runs the experiment."""
 
 __author__ = "Chris Bao"
-__version__ = "2.0"
-__date__ = "22 Jul 2022"
+__version__ = "2.1"
+__date__ = "25 Jul 2022"
 
 # IMPORTS #
 from datetime import datetime
@@ -28,19 +28,19 @@ MAX_DISPLACEMENT: int = 100
 LINE_WIDTH: int = 5
 
 # angle from radius to line
-LINE_ANGLE: int = 45 # controlled
+LINE_ANGLE: int = 45  # controlled
 
-LINE_LENGTHS = tuple(range(30, 180, 30)) # tuple[int]
-N_LINE_LENGTHS: int = len(LINE_LENGTHS) # 5
+LINE_LENGTHS = tuple(range(30, 180, 30))  # tuple[int]
+N_LINE_LENGTHS: int = len(LINE_LENGTHS)  # 5
 
-STIM_RADII = tuple(range(150, 400, 50)) # tuple[int]
-N_STIM_RADII: int = len(STIM_RADII) # 5
+STIM_RADII = tuple(range(150, 400, 50))  # tuple[int]
+N_STIM_RADII: int = len(STIM_RADII)  # 5
 
-STIM_PERIODS = (25, 50, 100, 150, 200) # tuple[int]
-N_STIM_PERIODS: int = len(STIM_PERIODS) # 5
+STIM_PERIODS = (25, 50, 100, 150, 200)  # tuple[int]
+N_STIM_PERIODS: int = len(STIM_PERIODS)  # 5
 
-N_TRIALS: int = N_LINE_LENGTHS * N_STIM_RADII * N_STIM_PERIODS # per block
-N_BLOCKS: int = 2 # note that one of these is reserved as practice
+N_TRIALS: int = N_LINE_LENGTHS * N_STIM_RADII * N_STIM_PERIODS  # per block
+N_BLOCKS: int = 5  # note that one of these is reserved as practice
 
 # trial length in seconds
 # NOTE: lab computer is slower (90% speed), so 2.7 s -> 3 s.
@@ -58,18 +58,18 @@ SEIZURE_WARNING: str = "WARNING: participating may potentially trigger"\
 with open("script.txt", "r") as f:
     script = tuple(f.read().split("==="))
 (INTRO_TEXT,
-INTRO_TEXT2,
-INTRO_TEXT3,
+ INTRO_TEXT2,
+ INTRO_TEXT3,
 
-PRAC_INTRO_TEXT,
-EXP_INTRO_TEXT,
+ PRAC_INTRO_TEXT,
+ EXP_INTRO_TEXT,
 
-REST_TEXT,
+ REST_TEXT,
 
-END_TEXT,
+ END_TEXT,
 
-NEXT_PROMPT,
-RATE_PROMPT) = script
+ NEXT_PROMPT,
+ RATE_PROMPT) = script
 
 PHASE_START = 0
 PHASE_PRAC = 1
@@ -143,11 +143,12 @@ phase: int
 # current state of program: what is being animated.
 state: int
 # stores index of line length, angle to use for each trial
-trials = [] # list[list[int]]
+trials = []  # list[list[int]]
 # current trial index
 trial: int
 # line length, stim radius, stim period, user rating
-results = [] # list[tuple[int, int, int, int]]
+practice_results = []  # for postmortem analysis
+results = []  # list[tuple[int, int, int, int]]
 
 # gets printed to console when experiment is closed
 stop_message: str = "Experiment was closed early."
@@ -156,11 +157,11 @@ stop_message: str = "Experiment was closed early."
 def mark_entered(_: Event) -> None:
     """
     Mark the slider as having been entered.
-    
+
     Parameters
     ----------
     _: Event given by the tkinter event handler. Ignored.
-    
+
     Returns
     -------
     None.
@@ -253,10 +254,13 @@ def update_stimulus() -> None:
     None
     """
     global lines, anim_radius
-    if frame_count % stim_period < stim_period/2:
-        anim_radius += MAX_DISPLACEMENT * (2 / stim_period)
+    cur_frame = frame_count % stim_period
+    if cur_frame < stim_period / 2:
+        anim_radius = stim_radius + (MAX_DISPLACEMENT * 2
+                                     * cur_frame / stim_period)
     else:
-        anim_radius -= MAX_DISPLACEMENT * (2 / stim_period)
+        anim_radius = stim_radius + (MAX_DISPLACEMENT * 2
+                                     * (stim_period - cur_frame) / stim_period)
     for i in range(N_STIM):
         cur_inner = lines[i][1]
         new_inner = list(get_inner(i))
@@ -329,6 +333,8 @@ def handle_button() -> None:
         elif state == STATE_RATE:
             if not rated:
                 return
+            practice_results.append((line_length, stim_radius, stim_period,
+                                     slider_var.get()))
             if trial == N_TRIALS:
                 phase = PHASE_REST
                 state = STATE_INTRO
@@ -339,8 +345,8 @@ def handle_button() -> None:
     elif phase == PHASE_REST:
         phase = PHASE_EXP
         state = STATE_INTRO
-        canvas.itemconfig(text, state="normal", text=EXP_INTRO_TEXT\
-                + NEXT_PROMPT)
+        canvas.itemconfig(text, state="normal", text=EXP_INTRO_TEXT
+                          + NEXT_PROMPT)
     elif phase == PHASE_EXP:
         if state == STATE_INTRO:
             state = STATE_PLAY
@@ -348,7 +354,7 @@ def handle_button() -> None:
         elif state == STATE_RATE:
             if not rated:
                 return
-            results.append((line_length, stim_radius, stim_period,\
+            results.append((line_length, stim_radius, stim_period,
                             slider_var.get()))
             if trial == N_TRIALS * N_BLOCKS:
                 phase = PHASE_END
@@ -425,7 +431,7 @@ def start_trial() -> None:
     None.
     """
     global line_length, stim_radius, stim_period, frame_count, rated,\
-            anim_radius
+        anim_radius
 
     canvas.itemconfig(text, state="hidden")
     for i in fixation:
