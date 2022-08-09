@@ -1,6 +1,6 @@
 Welcome!
 
-This experiment has 5 blocks of 125 trials.
+This experiment has 4 blocks of 125 trials.
 Between blocks, you will be given a short break.
 
 The first block will be made up of practice trials. These are to get you
@@ -17,8 +17,7 @@ Thank you for your participation!
 Controls
 
 On the upper left is the [Exit] button. You may press
-this at any time to stop the experiment. Note that if you stop early, your
-results will NOT be recorded.
+this at any time to stop the experiment.
 
 On the upper middle is the slider, which you will use to rate the illusion
 strength throughout the experiment. You will need to

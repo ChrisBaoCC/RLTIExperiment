@@ -40,7 +40,7 @@ STIM_PERIODS = (25, 50, 100, 150, 200)  # tuple[int]
 N_STIM_PERIODS: int = len(STIM_PERIODS)  # 5
 
 N_TRIALS: int = N_LINE_LENGTHS * N_STIM_RADII * N_STIM_PERIODS  # per block
-N_BLOCKS: int = 5  # note that one of these is reserved as practice
+N_BLOCKS: int = 4  # note that one of these is reserved as practice
 
 # trial length in seconds
 # NOTE: lab computer is slower (90% speed), so 2.7 s -> 3 s.
