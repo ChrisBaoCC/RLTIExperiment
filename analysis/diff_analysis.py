@@ -59,8 +59,38 @@ X = [
 
 Y_old = [[old_df[old_df[variables[i]] == j]["rating"]
           for j in X[i]] for i in range(3)]
+
+q1_old = []
+q2_old = []
+q3_old = []
+iqr_lo_old = []
+iqr_hi_old = []
+for i in range(3):
+    ps = np.percentile(Y_old[i], [25, 50, 75], axis=1)
+    q1_old.append(ps[0])
+    q2_old.append(ps[1])
+    q3_old.append(ps[2])
+    iqr_lo_old.append(ps[1] - 1.5 * (ps[2] - ps[0]))
+    iqr_hi_old.append(ps[1] + 1.5 * (ps[2] - ps[0]))
+inds_old = [np.arange(1, len(q2_old[i]) + 1) for i in range(3)]
+
+
 Y_new = [[new_df[new_df[variables[i]] == j]["rating"]
           for j in X[i]] for i in range(3)]
+
+q1_new = []
+q2_new = []
+q3_new = []
+iqr_lo_new = []
+iqr_hi_new = []
+for i in range(3):
+    ps = np.percentile(Y_new[i], [25, 50, 75], axis=1)
+    q1_new.append(ps[0])
+    q2_new.append(ps[1])
+    q3_new.append(ps[2])
+    iqr_lo_new.append(ps[1] - 1.5 * (ps[2] - ps[0]))
+    iqr_hi_new.append(ps[1] + 1.5 * (ps[2] - ps[0]))
+inds_new = [np.arange(1, len(q2_new[i]) + 1) for i in range(3)]
 
 titles = [
     "illusion strength vs. line length",
@@ -74,7 +104,7 @@ ax_labels = [
     "animation period (s)"
 ]
 
-# Plot data
+### OLD DATA ###
 
 fig = plt.figure(figsize=(14, 4))
 axs: list[plt.Axes] = [
@@ -97,12 +127,19 @@ for i in range(3):
     # for j in range(5):
     # axs[i].scatter([j]*250, Y_old[i][j])  # looks REALLY bad
 
-    axs[i].violinplot(Y_old[i])
+    axs[i].violinplot(Y_old[i], showextrema=False)
+
+    axs[i].scatter(inds_old[i], q2_old[i], color='black', s=20)
+    axs[i].vlines(inds_old[i], iqr_lo_old[i],
+                  iqr_hi_old[i], color='grey', lw=2)
+    axs[i].vlines(inds_old[i], q1_old[i], q3_old[i], color='black', lw=3)
 
     axs[i].set_title(titles[i])  # , fontsize=18)
     axs[i].set_xlabel(ax_labels[i])  # , fontsize=14)
     axs[i].set_ylabel("Average strength (%)")  # , fontsize=14)
 plt.show()
+
+### NEW DATA ###
 
 fig = plt.figure(figsize=(14, 4))
 axs: list[plt.Axes] = [
@@ -119,7 +156,12 @@ for i in range(3):
     # for j in range(5):
     # axs[i].scatter([j]*250, Y_old[i][j])  # looks REALLY bad
 
-    axs[i].violinplot(Y_new[i])
+    axs[i].violinplot(Y_new[i], showextrema=False)
+
+    axs[i].scatter(inds_new[i], q2_new[i], color='black', s=20)
+    axs[i].vlines(inds_new[i], iqr_lo_new[i],
+                  iqr_hi_new[i], color='grey', lw=2)
+    axs[i].vlines(inds_new[i], q1_new[i], q3_new[i], color='black', lw=3)
 
     axs[i].set_title(titles[i])  # , fontsize=18)
     axs[i].set_xlabel(ax_labels[i])  # , fontsize=14)

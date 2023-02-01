@@ -12,8 +12,8 @@ paths = glob.glob("../data/*")
 dfs = [pd.read_csv(path) for path in paths]
 df = pd.concat(dfs)
 
-plt.rc('font', size=20)  # 28 for 2d plots
-plt.rcParams["font.family"] = "Helvetica Neue"
+plt.rc('font', size=26)  # 26 for 2d plots
+plt.rcParams["font.family"] = "Ubuntu"
 plt.rcParams["font.weight"] = "medium"
 
 variables = [
@@ -24,7 +24,7 @@ variables = [
 names = [
     "line length",
     "stimulus radius",
-    "animation speed"
+    "animation period"
 ]
 labels = [
     "Line length (°)",
@@ -51,11 +51,15 @@ V = [[df[df[variables[i]] == j]["rating"] for j in X[i]] for i in range(3)]
 q1 = []
 q2 = []
 q3 = []
+iqr_lo = []
+iqr_hi = []
 for i in range(3):
     ps = np.percentile(V[i], [25, 50, 75], axis=1)
     q1.append(ps[0])
     q2.append(ps[1])
     q3.append(ps[2])
+    iqr_lo.append(ps[1] - 1.5 * (ps[2] - ps[0]))
+    iqr_hi.append(ps[1] + 1.5 * (ps[2] - ps[0]))
 inds = [np.arange(1, len(q2[i]) + 1) for i in range(3)]
 
 S = [[df[df[variables[i]] == j]["rating"].sem() for j in X[i]]
@@ -111,7 +115,7 @@ for VAR in range(3):
     #         solid_capstyle="butt")  # normal plot (cdf)
     # ax.errorbar(X[VAR], Y[VAR], S[VAR], capsize=7, fmt="none",
     #             ecolor="#000000", linewidth=5, capthick=5, solid_capstyle="round")
-    # set units on x-axis
+    # # set units on x-axis
     # ax.set_xticks(X[VAR])
     # ax.set_xticklabels(alt_ticklabels[VAR])
     # end line plots
@@ -122,17 +126,22 @@ for VAR in range(3):
         pc.set_facecolor(plt.get_cmap("Pastel1").colors[i])
         pc.set_alpha(1)
 
+    # show median
     ax.scatter(inds[VAR], q2[VAR], color='black', s=150)
+    # show whiskers (1.5 * IQR)
+    ax.vlines(inds[VAR], iqr_lo[VAR],
+              iqr_hi[VAR], color='grey', lw=3)
+    # show quartiles
     ax.vlines(inds[VAR], q1[VAR], q3[VAR], color='black', lw=5)
 
-    # set units on x-axis
-    # i don't know why I need to add an empty value and I don't care
+# i don't know why I need to add an empty value and I don't care
     ax.set_xticklabels([""] + alt_ticklabels[VAR])
+    # end violin plots
+
     ax.set_title(chr(ord('A') + VAR) + ". Illusion strength vs. " + names[VAR],
                  weight="bold", pad=20)
     ax.set_xlabel(labels[VAR], weight="medium")
     ax.set_ylabel("Average strength (%)", weight="medium")
-    # end line plots
 
     # linear regression
     # if VAR in [0, 1]:
